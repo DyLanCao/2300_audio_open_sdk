@@ -1,0 +1,34 @@
+cur_dir := $(dir $(lastword $(MAKEFILE_LIST)))
+
+obj-y := $(patsubst $(cur_dir)%,%,$(wildcard $(cur_dir)*.c $(cur_dir)*.cpp $(cur_dir)*.S))
+obj-y := $(obj-y:.c=.o)
+obj-y := $(obj-y:.cpp=.o)
+obj-y := $(obj-y:.S=.o)
+
+obj-y += $(CHIP)/
+
+subdir-ccflags-y += -Iservices/nvrecord -Iutils/cqueue -Iutils/heap
+
+ifeq ($(BT_XTAL_SYNC),1)
+subdir-ccflags-y += -DBT_XTAL_SYNC
+endif
+
+export BT_DRV_UART_BRIDGE_FLAGS :=
+ifneq ($(DEBUG_PORT),)
+BT_DRV_UART_BRIDGE_FLAGS += -DDEBUG_PORT=$(DEBUG_PORT)
+endif
+
+export BT_DRV_FLAGS :=
+ifeq ($(NO_SLEEP),1)
+BT_DRV_FLAGS += -DNO_SLEEP
+endif
+
+export BT_DRV_CONFIG_FLAGS :=
+ifeq ($(INTERSYS_NO_THREAD),1)
+BT_DRV_CONFIG_FLAGS += -D_INTERSYS_NO_THREAD_
+endif
+
+VCO_TEST_TOOL ?= 1
+ifeq ($(VCO_TEST_TOOL),1)
+subdir-ccflags-y += -DVCO_TEST_TOOL
+endif

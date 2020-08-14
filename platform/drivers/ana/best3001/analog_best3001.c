@@ -1,0 +1,3763 @@
+/***************************************************************************
+ *
+ * Copyright 2015-2019 BES.
+ * All rights reserved. All unpublished rights reserved.
+ *
+ * No part of this work may be used or reproduced in any form or by any
+ * means, or stored in a database or retrieval system, without prior written
+ * permission of BES.
+ *
+ * Use of this work is governed by a license granted by BES.
+ * This work contains confidential and proprietary information of
+ * BES. which is protected by copyright, trade secret,
+ * trademark and other intellectual property rights.
+ *
+ ****************************************************************************/
+#include <stdint.h>
+#include "stdbool.h"
+#include "cmsis.h"
+#ifdef RTOS
+#include "cmsis_os.h"
+#endif
+#include "tgt_hardware.h"
+#include "hal_trace.h"
+#include "hal_timer.h"
+#include "hal_cmu.h"
+#include "hal_codec.h"
+#include "hal_chipid.h"
+#include "analog.h"
+#include "pmu.h"
+
+#define ANALOG_TRACE(s,...)                 //TRACE(s, ##__VA_ARGS__)
+
+#define TX_PA_GAIN_0DB_DIFF                 0x1
+#define TX_PA_GAIN_0DB_SE                   0x2
+
+#define DEFAULT_TX_PA_GAIN                  tx_pa_gain_0db
+
+#define DEFAULT_VOICE_ADC_GAIN_DB           12
+
+#ifndef ANALOG_ADC_A_GAIN_DB
+#define ANALOG_ADC_A_GAIN_DB                DEFAULT_VOICE_ADC_GAIN_DB
+#endif
+
+#ifndef ANALOG_ADC_B_GAIN_DB
+#define ANALOG_ADC_B_GAIN_DB                DEFAULT_VOICE_ADC_GAIN_DB
+#endif
+
+#ifndef LINEIN_ADC_GAIN_DB
+#define LINEIN_ADC_GAIN_DB                  0
+#endif
+
+#ifndef CFG_HW_AUD_MICKEY_DEV
+#define CFG_HW_AUD_MICKEY_DEV               (AUD_VMIC_MAP_VMIC1)
+#endif
+
+#define DAC_GAIN_TO_QDB(n)                  ((n) * 3 * 4)
+#define QDB_TO_DAC_GAIN(n)                  ((n) / 4 / 3)
+
+#define DEFAULT_XTAL_FCAP                   0x8000
+#define DEFAULT_XTAL_FVAR                   0x8000
+
+// Default 0.26 ppm/FcapBit or 260 ppb/FcapBit
+#define DEFAULT_XTAL_TUNE_FACTOR            260
+
+#define MAX_XTAL_VALUE                      0x7FF
+
+#define XTAL_TUNE_FACTOR_UPDATE_THRESH      (16 * 8)
+#define XTAL_TUNE_FACTOR_UPDATE_STEP        (128 * 8)
+
+// REG61
+#define REG_CODEC_RX_EN_ADCA                (1 << 0)
+#define REG_CODEC_RX_EN_ADCB                (1 << 1)
+#define REG_CODEC_TX_EN_LDAC                (1 << 2)
+#define REG_CODEC_TX_EN_RDAC                (1 << 3)
+#define REG_CODEC_EN_TX                     (1 << 4)
+#define CFG_TX_CH0_MUTE                     (1 << 5)
+#define CFG_TX_CH1_MUTE                     (1 << 6)
+#define REG_CODEC_TX_DAC_MUTEL              (1 << 7)
+#define REG_CODEC_TX_DAC_MUTER              (1 << 8)
+#define REG_CODEC_TX_EN_LEAR                (1 << 9)
+#define REG_CODEC_TX_EN_REAR                (1 << 10)
+#define REG_CODEC_PGA1A_EN                  (1 << 11)
+#define REG_CODEC_PGA2A_EN                  (1 << 12)
+#define REG_CODEC_PGA1B_EN                  (1 << 13)
+#define REG_CODEC_PGA2B_EN                  (1 << 14)
+#define REG_CODEC_TX_EAR_OFF_EN             (1 << 15)
+
+// REG62
+#define REG_CODEC_PGA1A_CHANSEL_SHIFT       (0)
+#define REG_CODEC_PGA1A_CHANSEL_MASK        (0x3 << REG_CODEC_PGA1A_CHANSEL_SHIFT)
+#define REG_CODEC_PGA1A_CHANSEL(n)          BITFIELD_VAL(REG_CODEC_PGA1A_CHANSEL, n)
+#define REG_CODEC_PGA2A_CHANSEL_SHIFT       (2)
+#define REG_CODEC_PGA2A_CHANSEL_MASK        (0x3 << REG_CODEC_PGA2A_CHANSEL_SHIFT)
+#define REG_CODEC_PGA2A_CHANSEL(n)          BITFIELD_VAL(REG_CODEC_PGA2A_CHANSEL, n)
+#define REG_CODEC_PGA1B_CHANSEL_SHIFT       4
+#define REG_CODEC_PGA1B_CHANSEL_MASK        (0x3 << REG_CODEC_PGA1B_CHANSEL_SHIFT)
+#define REG_CODEC_PGA1B_CHANSEL(n)          BITFIELD_VAL(REG_CODEC_PGA1B_CHANSEL, n)
+#define REG_CODEC_PGA2B_CHANSEL_SHIFT       6
+#define REG_CODEC_PGA2B_CHANSEL_MASK        (0x3 << REG_CODEC_PGA2B_CHANSEL_SHIFT)
+#define REG_CODEC_PGA2B_CHANSEL(n)          BITFIELD_VAL(REG_CODEC_PGA2B_CHANSEL, n)
+#define REG_CODEC_TX_DAC_LPFVCM_SHIFT       8
+#define REG_CODEC_TX_DAC_LPFVCM_MASK        (0xF << REG_CODEC_TX_DAC_LPFVCM_SHIFT)
+#define REG_CODEC_TX_DAC_LPFVCM(n)          BITFIELD_VAL(REG_CODEC_TX_DAC_LPFVCM, n)
+#define REG_CODEC_TX_EAR_RSTB               (1 << 12)
+#define CFG_EN_RX                           (1 << 13)
+#define CFG_EN_RX_DR                        (1 << 14)
+#define REG_CODEC_TX_CLKSEL                 (1 << 15)
+
+// REG63
+#define REG_CODEC_TX_DAC_IBSEL_SHIFT        0
+#define REG_CODEC_TX_DAC_IBSEL_MASK         (0xF << REG_CODEC_TX_DAC_IBSEL_SHIFT)
+#define REG_CODEC_TX_DAC_IBSEL(n)           BITFIELD_VAL(REG_CODEC_TX_DAC_IBSEL, n)
+#define REG_CODEC_TX_DAC_IDAC_SEL_SHIFT     4
+#define REG_CODEC_TX_DAC_IDAC_SEL_MASK      (0xF << REG_CODEC_TX_DAC_IDAC_SEL_SHIFT)
+#define REG_CODEC_TX_DAC_IDAC_SEL(n)        BITFIELD_VAL(REG_CODEC_TX_DAC_IDAC_SEL, n)
+#define REG_CODEC_TX_DAC_VCAS_SEL_SHIFT     8
+#define REG_CODEC_TX_DAC_VCAS_SEL_MASK      (0x1F << REG_CODEC_TX_DAC_VCAS_SEL_SHIFT)
+#define REG_CODEC_TX_DAC_VCAS_SEL(n)        BITFIELD_VAL(REG_CODEC_TX_DAC_VCAS_SEL, n)
+#define REG_CRYSTAL_SEL_LV                  (1 << 13)
+#define CFG_TX_CLK_INV                      (1 << 14)
+#define REG_PU_OSC                          (1 << 15)
+
+// REG64
+#define CFG_RESET_ADC_A                     (1 << 0)
+#define CFG_RESET_ADC_A_DR                  (1 << 1)
+#define CFG_RESET_ADC_B                     (1 << 2)
+#define CFG_RESET_ADC_B_DR                  (1 << 3)
+#define REG_CODEC_RX_IBSEL_SHIFT            4
+#define REG_CODEC_RX_IBSEL_MASK             (0xF << REG_CODEC_RX_IBSEL_SHIFT)
+#define REG_CODEC_RX_IBSEL(n)               BITFIELD_VAL(REG_CODEC_RX_IBSEL, n)
+#define REG_CODEC_ADC_IBSEL_SHIFT           8
+#define REG_CODEC_ADC_IBSEL_MASK            (0xF << REG_CODEC_ADC_IBSEL_SHIFT)
+#define REG_CODEC_ADC_IBSEL(n)              BITFIELD_VAL(REG_CODEC_ADC_IBSEL, n)
+#define REG_CODEC_ADC_VREF_SEL_SHIFT        12
+#define REG_CODEC_ADC_VREF_SEL_MASK         (0xF << REG_CODEC_ADC_VREF_SEL_SHIFT)
+#define REG_CODEC_ADC_VREF_SEL(n)           BITFIELD_VAL(REG_CODEC_ADC_VREF_SEL, n)
+
+// REG65
+#define CFG_TX_EN_LPPA                      (1 << 0)
+#define CFG_TX_EN_LPPA_DR                   (1 << 1)
+#define CFG_TX_EN_S1PA                      (1 << 2)
+#define CFG_TX_EN_S1PA_DR                   (1 << 3)
+#define CFG_TX_EN_S2PA                      (1 << 4)
+#define CFG_TX_EN_S2PA_DR                   (1 << 5)
+#define CFG_TX_EN_S3PA                      (1 << 6)
+#define CFG_TX_EN_S3PA_DR                   (1 << 7)
+#define CFG_TX_EN_DACLDO                    (1 << 8)
+#define CFG_TX_EN_DACLDO_DR                 (1 << 9)
+#define CFG_TX_EN_VTOI                      (1 << 10)
+#define CFG_TX_EN_VTOI_DR                   (1 << 11)
+#define REG_IDET_LEAR                       (1 << 12)
+#define REG_IDET_REAR                       (1 << 13)
+#define CFG_TX_TREE_EN                      (1 << 14)
+
+// REG66
+#define CFG_PGA_RESETN                      (1 << 0)
+#define CFG_PGA_RESETN_DR                   (1 << 1)
+#define REG_CODEC_PGA1A_CAPMODE             (1 << 2)
+#define REG_CODEC_PGA1A_FASTSETTLE          (1 << 3)
+#define REG_CODEC_PGA1B_CAPMODE             (1 << 4)
+#define REG_CODEC_PGA1B_FASTSETTLE          (1 << 5)
+#define REG_PGA2A_DETEN                     (1 << 6)
+#define REG_PGA2B_DETEN                     (1 << 7)
+#define REG_CODEC_PGA1A_GAIN_SHIFT          8
+#define REG_CODEC_PGA1A_GAIN_MASK           (0x7 << REG_CODEC_PGA1A_GAIN_SHIFT)
+#define REG_CODEC_PGA1A_GAIN(n)             BITFIELD_VAL(REG_CODEC_PGA1A_GAIN, n)
+#define REG_CODEC_PGA1B_GAIN_SHIFT          11
+#define REG_CODEC_PGA1B_GAIN_MASK           (0x7 << REG_CODEC_PGA1B_GAIN_SHIFT)
+#define REG_CODEC_PGA1B_GAIN(n)             BITFIELD_VAL(REG_CODEC_PGA1B_GAIN, n)
+
+// REG67
+#define REG_PGA2A_GAIN_SHIFT                0
+#define REG_PGA2A_GAIN_MASK                 (0x7 << REG_PGA2A_GAIN_SHIFT)
+#define REG_PGA2A_GAIN(n)                   BITFIELD_VAL(REG_PGA2A_GAIN, n)
+#define REG_PGA2B_GAIN_SHIFT                3
+#define REG_PGA2B_GAIN_MASK                 (0x7 << REG_PGA2B_GAIN_SHIFT)
+#define REG_PGA2B_GAIN(n)                   BITFIELD_VAL(REG_PGA2B_GAIN, n)
+#define REG_ADC_SLOWMODE                    (1 << 6)
+#define REG_CODEC_ADC_VCM_CLOSE             (1 << 7)
+#define REG_PGA1A_DACGAIN_SHIFT             8		// absoleted
+#define REG_PGA1A_DACGAIN_MASK              (0x3 << REG_PGA1A_DACGAIN_SHIFT)
+#define REG_PGA1A_DACGAIN(n)                BITFIELD_VAL(REG_PGA1A_DACGAIN, n)
+#define REG_PGA1B_DACGAIN_SHIFT             10		// absoleted
+#define REG_PGA1B_DACGAIN_MASK              (0x3 << REG_PGA1B_DACGAIN_SHIFT)
+#define REG_PGA1B_DACGAIN(n)                BITFIELD_VAL(REG_PGA1B_DACGAIN, n)
+#define REG_CODEC_PGA1A_LARGEGAIN           (1 << 12)
+#define REG_CODEC_PGA1B_LARGEGAIN           (1 << 13)
+#define REG_CODEC_RXBIAS_LOWV               (1 << 14)
+
+// REG068
+#define REG_CODEC_TX_EAR_DIS_SHIFT          0
+#define REG_CODEC_TX_EAR_DIS_MASK           (0x3 << REG_CODEC_TX_EAR_DIS_SHIFT)
+#define REG_CODEC_TX_EAR_DIS(n)             BITFIELD_VAL(REG_CODEC_TX_EAR_DIS, n)
+#define REG_CODEC_TX_EAR_DOUBLEBIAS         (1 << 2)
+#define REG_CODEC_TX_EAR_ENBIAS             (1 << 3)
+#define REG_CODEC_TX_EAR_GAIN_SHIFT         4
+#define REG_CODEC_TX_EAR_GAIN_MASK          (0x3 << REG_CODEC_TX_EAR_GAIN_SHIFT)
+#define REG_CODEC_TX_EAR_GAIN(n)            BITFIELD_VAL(REG_CODEC_TX_EAR_GAIN, n)
+#define REG_CODEC_TX_EAR_IBSEL_SHIFT        6
+#define REG_CODEC_TX_EAR_IBSEL_MASK         (0x3 << REG_CODEC_TX_EAR_IBSEL_SHIFT)
+#define REG_CODEC_TX_EAR_IBSEL(n)           BITFIELD_VAL(REG_CODEC_TX_EAR_IBSEL, n)
+#define REG_CODEC_TX_EAR_LPBIAS             (1 << 8)
+#define REG_CODEC_TX_EAR_OCEN               (1 << 9)
+#define REG_CODEC_TX_EAR_SOFTSTART_SHIFT    10
+#define REG_CODEC_TX_EAR_SOFTSTART_MASK     (0x3F << REG_CODEC_TX_EAR_SOFTSTART_SHIFT)
+#define REG_CODEC_TX_EAR_SOFTSTART(n)       BITFIELD_VAL(REG_CODEC_TX_EAR_SOFTSTART, n)
+
+// REG069
+#define REG_CODEC_TX_EAR_OUTPUTSEL_SHIFT    0
+#define REG_CODEC_TX_EAR_OUTPUTSEL_MASK     (0xF << REG_CODEC_TX_EAR_OUTPUTSEL_SHIFT)
+#define REG_CODEC_TX_EAR_OUTPUTSEL(n)       BITFIELD_VAL(REG_CODEC_TX_EAR_OUTPUTSEL, n)
+#define REG_CODEC_TX_LDOVSEL_SHIFT          4
+#define REG_CODEC_TX_LDOVSEL_MASK           (0x1F << REG_CODEC_TX_LDOVSEL_SHIFT)
+#define REG_CODEC_TX_LDOVSEL(n)             BITFIELD_VAL(REG_CODEC_TX_LDOVSEL, n)
+#define REG_CODEC_VCMBUF_VSEL_SHIFT         9
+#define REG_CODEC_VCMBUF_VSEL_MASK          (0x7 << REG_CODEC_VCMBUF_VSEL_SHIFT)
+#define REG_CODEC_VCMBUF_VSEL(n)            BITFIELD_VAL(REG_CODEC_VCMBUF_VSEL, n)
+#define REG_CODEC_TEST_SEL_SHIFT            12
+#define REG_CODEC_TEST_SEL_MASK             (0x7 << REG_CODEC_TEST_SEL_SHIFT)
+#define REG_CODEC_TEST_SEL(n)               BITFIELD_VAL(REG_CODEC_TEST_SEL, n)
+
+// REG06A
+#define REG_CODEC_VCMBUF_LOWP_SHIFT         0
+#define REG_CODEC_VCMBUF_LOWP_MASK          (0x3 << REG_CODEC_VCMBUF_LOWP_SHIFT)
+#define REG_CODEC_VCMBUF_LOWP(n)            BITFIELD_VAL(REG_CODEC_VCMBUF_LOWP, n)
+#define REG_CODEC_EN_VCMLPF                 (1 << 2)
+#define REG_CODEC_ADC_VREFP_CLOSE           (1 << 3)
+#define REG_CODEC_ADC_VCM_RES_SHIFT         4
+#define REG_CODEC_ADC_VCM_RES_MASK          (0x3 << REG_CODEC_ADC_VCM_RES_SHIFT)
+#define REG_CODEC_ADC_VCM_RES(n)            BITFIELD_VAL(REG_CODEC_ADC_VCM_RES, n)
+#define REG_CODEC_ADC_VREFP_RES_SHIFT       6
+#define REG_CODEC_ADC_VREFP_RES_MASK        (0x3 << REG_CODEC_ADC_VREFP_RES_SHIFT)
+#define REG_CODEC_ADC_VREFP_RES(n)          BITFIELD_VAL(REG_CODEC_ADC_VREFP_RES, n)
+#define REG_CODEC_VCM_VSEL_SHIFT            8
+#define REG_CODEC_VCM_VSEL_MASK             (0xF << REG_CODEC_VCM_VSEL_SHIFT)
+#define REG_CODEC_VCM_VSEL(n)               BITFIELD_VAL(REG_CODEC_VCM_VSEL, n)
+
+// REG6B
+#define REG_CODEC_TX_EAR_OFF_BITR_SHIFT     0
+#define REG_CODEC_TX_EAR_OFF_BITR_MASK      (0x3FF << REG_CODEC_TX_EAR_OFF_BITR_SHIFT)
+#define REG_CODEC_TX_EAR_OFF_BITR(n)        BITFIELD_VAL(REG_CODEC_TX_EAR_OFF_BITR, n)
+#define RX_TIMER_RSTN_DLY_SHIFT             10
+#define RX_TIMER_RSTN_DLY_MASK              (0x3F << RX_TIMER_RSTN_DLY_SHIFT)
+#define RX_TIMER_RSTN_DLY(n)                BITFIELD_VAL(RX_TIMER_RSTN_DLY, n)
+
+// REG06C
+#define REG_CODEC_TX_EAR_OFF_BITL_SHIFT     0
+#define REG_CODEC_TX_EAR_OFF_BITL_MASK      (0x3FF << REG_CODEC_TX_EAR_OFF_BITL_SHIFT)
+#define REG_CODEC_TX_EAR_OFF_BITL(n)        BITFIELD_VAL(REG_CODEC_TX_EAR_OFF_BITL, n)
+#define REG_CODEC_TX_EAR_LCAL               (1 << 10)
+#define REG_CODEC_TX_EAR_LSTB               (1 << 11)
+#define REG_CODEC_TX_EAR_RCAL               (1 << 12)
+
+// REG06D
+
+
+// REG06E
+
+
+// REG06F
+
+
+// REG070
+#define REG070_DBL_DL1_SHIFT        0
+#define REG070_DBL_DL1_MASK         (0xf << REG070_DBL_DL1_SHIFT)
+#define REG070_DBL_DL1(n)           BITFIELD_VAL(REG070_DBL_DL1, n)
+#define REG070_DBL_DL2_SHIFT        4
+#define REG070_DBL_DL2_MASK         (0xf << REG070_DBL_DL2_SHIFT)
+#define REG070_DBL_DL2(n)           BITFIELD_VAL(REG070_DBL_DL2, n)
+#define REG070_DIG_DBL_EN                   (1 << 8)
+#define REG070_DIG_DBL_RST                  (1 << 9)
+#define REG070_CODEC_TX_IB_HALF        (1<<10)
+#define REG070_CODEC_TX_DAC_XV_SHIFT        11
+#define REG070_CODEC_TX_DAC_XV_MASK         (0x7 << REG070_CODEC_TX_DAC_XV_SHIFT)
+#define REG070_CODEC_TX_DAC_XV(n)           BITFIELD_VAL(REG070_CODEC_TX_DAC_XV, n)
+
+// REG071
+#define REG071_DBL_DCC1_CAP_STB_SHIFT               0
+#define REG071_DBL_DCC1_CAP_STB_MASK                (3 << REG071_DBL_DCC1_CAP_STB_SHIFT)
+#define REG071_DBL_DCC1_CAP_STB(n)                 BITFIELD_VAL(REG071_DBL_DCC1_CAP_STB, n)
+#define REG071_DBL_DCC2_CAP_STB_SHIFT               2
+#define REG071_DBL_DCC2_CAP_STB_MASK                (3 << REG071_DBL_DCC2_CAP_STB_SHIFT)
+#define REG071_DBL_DCC2_CAP_STB(n)                 BITFIELD_VAL(REG071_DBL_DCC2_CAP_STB, n)
+#define REG071_DBL_DCC3_CAP_STB_SHIFT               4
+#define REG071_DBL_DCC3_CAP_STB_MASK                (3 << REG071_DBL_DCC3_CAP_STB_SHIFT)
+#define REG071_DBL_DCC3_CAP_STB(n)                 BITFIELD_VAL(REG071_DBL_DCC3_CAP_STB, n)
+#define REG071_DBL_DCC1_RES_SHIFT               6
+#define REG071_DBL_DCC1_RES_MASK                (3 << REG071_DBL_DCC1_RES_SHIFT)
+#define REG071_DBL_DCC1_RES(n)                 BITFIELD_VAL(REG071_DBL_DCC1_RES, n)
+#define REG071_DBL_DCC2_RES_SHIFT               8
+#define REG071_DBL_DCC2_RES_MASK                (3 << REG071_DBL_DCC2_RES_SHIFT)
+#define REG071_DBL_DCC2_RES(n)                 BITFIELD_VAL(REG071_DBL_DCC2_RES, n)
+#define REG071_DBL_DCC3_RES_SHIFT               10
+#define REG071_DBL_DCC3_RES_MASK                (3 << REG071_DBL_DCC3_RES_SHIFT)
+#define REG071_DBL_DCC3_RES(n)                 BITFIELD_VAL(REG071_DBL_DCC3_RES, n)
+#define REG071_DBL_IC_BOOST_SHIFT               12
+#define REG071_DBL_IC_BOOST_MASK                (3 << REG071_DBL_IC_BOOST_SHIFT)
+#define REG071_DBL_IC_BOOST(n)                 BITFIELD_VAL(REG071_DBL_IC_BOOST, n)
+#define REG071_DBL_FREQ_SEL                     (1<<14)
+
+// REG072
+#define REG072_XO_TOP_PU_XTAL_DLY_SHIFT     0
+#define REG072_XO_TOP_PU_XTAL_DLY_MASK      (0x1f << REG072_XO_TOP_PU_XTAL_DLY_SHIFT)
+#define REG072_XO_TOP_PU_XTAL_DLY(n)    BITFIELD_VAL(REG072_XO_TOP_PU_XTAL_DLY, n)
+#define REG072_XO_TOP_XTAL_PU_DR            (1<<5)
+#define REG072_XO_TOP_XTAL_PU                   (1<<6)
+#define REG072_XO_TOP_PU_XTAL_DSLEEP    (1<<7)
+#define REG072_XO_TOP_PU_XTAL_PU_LPM_DR     (1<<8)
+#define REG072_XO_TOP_PU_XTAL_PU_LPM            (1<<9)
+#define REG072_XO_TOP_XTAL_SEL_MODE_DR          (1<<10)
+#define REG072_XO_TOP_XTAL_SEL_MODE             (1<<11)
+#define REG072_XO_TOP_XTAL_RSTB_LDO_DR          (1<<12)
+#define REG072_XO_TOP_XTAL_RSTB_LDO                 (1<<13)
+#define REG072_XO_TOP_XTAL_PU_CLKBUF_DR         (1<<14)
+#define REG072_XTAL_EN_RCOSC                            (1<<15)
+
+// REG073
+#define REG073_XO_TOP_XTAL_PU_CLKBUF_SLP_SHIFT      0
+#define REG073_XO_TOP_XTAL_PU_CLKBUF_SLP_MASK       (0xff << REG073_XO_TOP_XTAL_PU_CLKBUF_SLP_SHIFT)
+#define REG073_XO_TOP_XTAL_PU_CLKBUF_SLP(n)         BITFIELD_VAL(REG073_XO_TOP_XTAL_PU_CLKBUF_SLP, n)
+#define REG073_XO_TOP_XTAL_PU_CLKBUF_SHIFT      0
+#define REG073_XO_TOP_XTAL_PU_CLKBUF_MASK       (0xff << REG073_XO_TOP_XTAL_PU_CLKBUF_SHIFT)
+#define REG073_XO_TOP_XTAL_PU_CLKBUF(n)         BITFIELD_VAL(REG073_XO_TOP_XTAL_PU_CLKBUF, n)
+
+// REG074
+#define REG074_XO_TOP_XTAL_PU_CLKBUF_EXTRA_SHIFT      0
+#define REG074_XO_TOP_XTAL_PU_CLKBUF_EXTRA_MASK       (0xff << REG074_XO_TOP_XTAL_PU_CLKBUF_EXTRA_SHIFT)
+#define REG074_XO_TOP_XTAL_PU_CLKBUF_EXTRA(n)         BITFIELD_VAL(REG074_XO_TOP_XTAL_PU_CLKBUF_EXTRA, n)
+#define REG074_XO_TOP_XTAL_PU_CLKBUF_DSLEEP_SHIFT      8
+#define REG074_XO_TOP_XTAL_PU_CLKBUF_DSLEEP_MASK       (0xff << REG074_XO_TOP_XTAL_PU_CLKBUF_DSLEEP_SHIFT)
+#define REG074_XO_TOP_XTAL_PU_CLKBUF_DSLEEP(n)         BITFIELD_VAL(REG074_XO_TOP_XTAL_PU_CLKBUF_DSLEEP, n)
+
+// REG075
+#define REG075_XTAL_CLKBUF_DRV_15_00_SHIFT        0
+#define REG075_XTAL_CLKBUF_DRV_15_00_MASK         (0xffff << REG075_XTAL_CLKBUF_DRV_15_00_SHIFT)
+#define REG075_XTAL_CLKBUF_DRV_15_00(n)           BITFIELD_VAL(REG075_XTAL_CLKBUF_DRV_15_00, n)
+
+// REG076
+#define REG076_XTAL_RCOSC_TRIM_SHIFT        0
+#define REG076_XTAL_RCOSC_TRIM_MASK         (0xf << REG076_XTAL_RCOSC_TRIM_SHIFT)
+#define REG076_XTAL_RCOSC_TRIM(n)           BITFIELD_VAL(REG076_XTAL_RCOSC_TRIM, n)
+#define REG076_XTAL_VRDAC_SHIFT        4
+#define REG076_XTAL_VRDAC_MASK         (0x3 << REG076_XTAL_VRDAC_SHIFT)
+#define REG076_XTAL_VRDAC(n)           BITFIELD_VAL(REG076_XTAL_VRDAC, n)
+#define REG076_XTAL_SEL_TP_SHIFT        6
+#define REG076_XTAL_SEL_TP_MASK         (0x7 << REG076_XTAL_SEL_TP_SHIFT)
+#define REG076_XTAL_SEL_TP(n)          BITFIELD_VAL(REG076_XTAL_SEL_TP, n) 
+#define REG076_XTAL_MANUAL_KICK         (1<<9)
+#define REG076_XTAL_LDO_HPM_TRIM_SHIFT      10
+#define REG076_XTAL_LDO_HPM_TRIM_MASK      (0x7 << REG076_XTAL_LDO_HPM_TRIM_SHIFT)
+#define REG076_XTAL_LDO_HPM_TRIM(n)         BITFIELD_VAL(REG076_XTAL_LDO_HPM_TRIM, n) 
+#define REG076_XTAL_MANUAL_KICK_EN              (1<<13)
+#define REG076_XTAL_CLKBUF_DRV_17_16_SHIFT      14
+#define REG076_XTAL_CLKBUF_DRV_17_16_MASK      (0x3 << REG076_XTAL_CLKBUF_DRV_17_16_SHIFT)
+#define REG076_XTAL_CLKBUF_DRV_17_16(n)     BITFIELD_VAL(REG076_XTAL_CLKBUF_DRV_17_16, n) 
+
+// REG077
+#define REG077_XTAL_FVAR_SHIFT          0
+#define REG077_XTAL_FVAR_MASK           (0xff << REG077_XTAL_FVAR_SHIFT)
+#define REG077_XTAL_FVAR(n)             BITFIELD_VAL(REG077_XTAL_FVAR, n) 
+#define REG077_XTAL_CORE_ITRIM_SHIFT    8
+#define REG077_XTAL_CORE_ITRIM_MASK     (0x3 << REG077_XTAL_CORE_ITRIM_SHIFT)
+#define REG077_XTAL_CORE_ITRIM(n)       BITFIELD_VAL(REG077_XTAL_CORE_ITRIM, n) 
+#define REG077_XTAL_LDO_HPM_ITRIM_SHIFT     10
+#define REG077_XTAL_LDO_HPM_ITRIM_MASK      (0x3 << REG077_XTAL_LDO_HPM_ITRIM_SHIFT)
+#define REG077_XTAL_LDO_HPM_ITRIM(n)        BITFIELD_VAL(REG077_XTAL_LDO_HPM_ITRIM, n) 
+#define REG077_XTAL_LDO_LPM_VTRIM_SHIFT     12
+#define REG077_XTAL_LDO_LPM_VTRIM_MASK      (0x3 << REG077_XTAL_LDO_LPM_VTRIM_SHIFT)
+#define REG077_XTAL_LDO_LPM_VTRIM(n)        BITFIELD_VAL(REG077_XTAL_LDO_LPM_VTRIM, n) 
+
+// REG078
+#define REG078_XTAL_AAC_SLEEP_EN        (1<<0)
+#define REG078_XTAL_AAC_RSTN                (1<<1)
+#define REG078_XTAL_AAC_ICAL_DR           (1<<2)
+#define REG078_XTAL_AAC_ICAL_SHIFT     3
+#define REG078_XTAL_AAC_ICAL_MASK       (0x1f << REG078_XTAL_AAC_ICAL_SHIFT)
+#define REG078_XTAL_AAC_ICAL(n)         BITFIELD_VAL(REG078_XTAL_AAC_ICAL, n) 
+#define REG078_STABLE_VALUE_SHIFT  8
+#define REG078_STABLE_VALUE_MASK   (0x1f << REG078_STABLE_VALUE_SHIFT)
+#define REG078_STABLE_VALUE(n)     BITFIELD_VAL(REG078_STABLE_VALUE, n) 
+#define REG078_XTAL_DIV_MODE_SHIFT  13
+#define REG078_XTAL_DIV_MODE_MASK   (0x3 << REG078_XTAL_DIV_MODE_SHIFT)
+#define REG078_XTAL_DIV_MODE(n)     BITFIELD_VAL(REG078_XTAL_DIV_MODE, n) 
+
+// REG079
+#define REG079_AMP_ABS_NORMAL_SHIFT     0
+#define REG079_AMP_ABS_NORMAL_MASK      (0x3 << REG079_AMP_ABS_NORMAL_SHIFT)
+#define REG079_AMP_ABS_NORMAL(n)        BITFIELD_VAL(REG079_AMP_ABS_NORMAL, n) 
+#define REG079_AMP_ABS_DSLEEP_SHIFT     2
+#define REG079_AMP_ABS_DSLEEP_MASK      (0x3 << REG079_AMP_ABS_DSLEEP_SHIFT)
+#define REG079_AMP_ABS_DSLEEP(n)        BITFIELD_VAL(REG079_AMP_ABS_DSLEEP, n) 
+#define REG079_AMP_RANGE_NORMAL_SHIFT     4
+#define REG079_AMP_RANGE_NORMAL_MASK      (0xf << REG079_AMP_RANGE_NORMAL_SHIFT)
+#define REG079_AMP_RANGE_NORMAL(n)        BITFIELD_VAL(REG079_AMP_RANGE_NORMAL, n) 
+#define REG079_AMP_RANGE_DSLEEP_SHIFT     8
+#define REG079_AMP_RANGE_DSLEEP_MASK      (0xf << REG079_AMP_RANGE_DSLEEP_SHIFT)
+#define REG079_AMP_RANGE_DSLEEP(n)        BITFIELD_VAL(REG079_AMP_RANGE_DSLEEP, n) 
+#define REG079_PU_OSC_DLY_CNT_SHIFT     12
+#define REG079_PU_OSC_DLY_CNT_MASK      (0xf << REG079_PU_OSC_DLY_CNT_SHIFT)
+#define REG079_PU_OSC_DLY_CNT(n)        BITFIELD_VAL(REG079_PU_OSC_DLY_CNT, n) 
+
+// REG07A
+#define REG07A_XTAL_FCAP_NORMAL_SHIFT       0
+#define REG07A_XTAL_FCAP_NORMAL_MASK        (0xff << REG07A_XTAL_FCAP_NORMAL_SHIFT)
+#define REG07A_XTAL_FCAP_NORMAL(n)      BITFIELD_VAL(REG07A_XTAL_FCAP_NORMAL, n) 
+#define REG07A_XTAL_FCAP_DSLEEP_SHIFT       0
+#define REG07A_XTAL_FCAP_DSLEEP_MASK        (0xff << REG07A_XTAL_FCAP_DSLEEP_SHIFT)
+#define REG07A_XTAL_FCAP_DSLEEP(n)      BITFIELD_VAL(REG07A_XTAL_FCAP_DSLEEP, n) 
+
+// REG07B
+#define REG07B_DCO_PU_XO_BUFF               (1<<0)
+#define REG07B_DCO_PU_LDO                       (1<<1)
+#define REG07B_DCO_PU_CORE                      (1<<2)
+#define REG07B_DCO_PU_BUFFER_PRES        (1<<3)
+#define REG07B_DCO_PU_DIVN                      (1<<4)
+#define REG07B_DCO_XO_BUF_SEL_MODE      (1<<5)
+#define REG07B_DCO_XO_PWUP                      (1<<6)
+#define REG07B_DCO_TST_BUF_RCTRL_SHIFT      7
+#define REG07B_DCO_TST_BUF_RCTRL_MASK       (0xf << REG07B_DCO_TST_BUF_RCTRL_SHIFT)
+#define REG07B_DCO_TST_BUF_RCTRL(n)         BITFIELD_VAL(REG07B_DCO_TST_BUF_RCTRL, n) 
+#define REG07B_DCO_XO_BUF_PWUP_SHIFT        11
+#define REG07B_DCO_XO_BUF_PWUP_MASK         (0xf << REG07B_DCO_XO_BUF_PWUP_SHIFT)
+#define REG07B_DCO_XO_BUF_PWUP(n)           BITFIELD_VAL(REG07B_DCO_XO_BUF_PWUP, n) 
+#define REG07B_DCO_FINE_TUNE_RST            (1<<15)
+
+// REG07C
+#define REG07C_DCO_FINE_CLK_SEL           (1<<0)
+#define REG07C_COARSE_EN                        (1<<1)
+#define REG07C_FINE_EN                              (1<<2)
+#define REG07C_DCO_PU_XO_BUF_DR         (1<<3)
+#define REG07C_DCO_PU_LDO_DR                (1<<4)
+#define REG07C_DCO_PU_CORE_DR               (1<<5)
+#define REG07C_DCO_PU_BUF_PRES_DR       (1<<6)
+#define REG07C_DCO_PU_DIVN_DR               (1<<7)
+#define REG07C_DCO_XO_BUF_RCTRL_DR      (1<<8)
+#define REG07C_DCO_PWUP_DR                      (1<<9)
+#define REG07C_DCO_TST_BUF_RCTRL_DR     (1<<10)
+#define REG07C_DCO_XO_BUF_PWUP_DR       (1<<11)
+#define REG07C_DCO_FINE_TUN_RST_DR      (1<<12)
+#define REG07C_COARSE_EN_DR                     (1<<13)
+#define REG07C_FINE_EN_DR                           (1<<14)
+
+// REG07D
+#define REG07D_DAC_LOOP_DIV_RATIO_SHIFT         0
+#define REG07D_DAC_LOOP_DIV_RATIO_MASK          (0x3f << REG07D_DAC_LOOP_DIV_RATIO_SHIFT)
+#define REG07D_DAC_LOOP_DIV_RATIO(n)        BITFIELD_VAL(REG07D_DAC_LOOP_DIV_RATIO, n) 
+#define REG07D_DAC_XO_DIV_RATIO_SHIFT         6
+#define REG07D_DAC_XO_DIV_RATIO_MASK          (0x3f << REG07D_DAC_XO_DIV_RATIO_SHIFT)
+#define REG07D_DAC_XO_DIV_RATIO(n)        BITFIELD_VAL(REG07D_DAC_XO_DIV_RATIO, n) 
+#define REG07D_DAC_BUF_RES_SHIFT         12
+#define REG07D_DAC_BUF_RES_MASK          (0x7 << REG07D_DAC_XO_DIV_RATIO_SHIFT)
+#define REG07D_DAC_BUF_RES(n)        BITFIELD_VAL(REG07D_DAC_BUF_RES, n) 
+
+// REG07E
+#define REG07E_DCO_CB_TUN_SHIFT        0
+#define REG07E_DCO_CB_TUN_MASK          (0xff << REG07E_DCO_CB_TUN_SHIFT)
+#define REG07E_DCO_CB_TUN(n)          BITFIELD_VAL(REG07E_DCO_CB_TUN, n)   
+#define REG07E_DCO_RBP_TUN_SHIFT        8
+#define REG07E_DCO_RBP_TUN_MASK          (0x7 << REG07E_DCO_RBP_TUN_SHIFT)
+#define REG07E_DCO_RBP_TUN(n)          BITFIELD_VAL(REG07E_DCO_RBP_TUN, n)   
+#define REG07E_DCO_RBN_TUN_SHIFT        11
+#define REG07E_DCO_RBN_TUN_MASK          (0x7 << REG07E_DCO_RBN_TUN_SHIFT)
+#define REG07E_DCO_RBN_TUN(n)          BITFIELD_VAL(REG07E_DCO_RBN_TUN, n)   
+
+// REG07F
+#define REG07F_CALOUT_LEAR          (0<<1)
+#define REG07F_CALOUT_REAR          (1<<1)
+
+
+// REG161
+#define REG161_DCO_LDO_BUF_RCTRL_SHIFT       0
+#define REG161_DCO_LDO_BUF_RCTRL_MASK        (0x7 << REG161_DCO_LDO_BUF_RCTRL_SHIFT)
+#define REG161_DCO_LDO_BUF_RCTRL(n)      BITFIELD_VAL(REG161_DCO_LDO_BUF_RCTRL, n)  
+#define REG161_DCO_LDO_XO_BUF_RCTRL_SHIFT       3
+#define REG161_DCO_LDO_XO_BUF_RCTRL_MASK        (0x7 << REG161_DCO_LDO_XO_BUF_RCTRL_SHIFT)
+#define REG161_DCO_LDO_XO_BUF_RCTRL(n)      BITFIELD_VAL(REG161_DCO_LDO_XO_BUF_RCTRL, n) 
+#define REG161_DCO_LDO_DIVN_RCTRL_SHIFT       6
+#define REG161_DCO_LDO_DIVN_RCTRL_MASK        (0x7 << REG161_DCO_LDO_DIVN_RCTRL_SHIFT)
+#define REG161_DCO_LDO_DIVN_RCTRL(n)      BITFIELD_VAL(REG161_DCO_LDO_DIVN_RCTRL, n) 
+#define REG161_DCO_LDO_PRES_RCTRL_SHIFT       9
+#define REG161_DCO_LDO_PRES_RCTRL_MASK        (0x7 << REG161_DCO_LDO_PRES_RCTRL_SHIFT)
+#define REG161_DCO_LDO_PRES_RCTRL(n)      BITFIELD_VAL(REG161_DCO_LDO_PRES_RCTRL, n) 
+#define REG161_DCO_LDO_CORE_RCTRL_SHIFT       12
+#define REG161_DCO_LDO_CORE_RCTRL_MASK        (0x7 << REG161_DCO_LDO_CORE_RCTRL_SHIFT)
+#define REG161_DCO_LDO_CORE_RCTRL(n)      BITFIELD_VAL(REG161_DCO_LDO_CORE_RCTRL, n) 
+
+// REG162
+#define REG162_DCO_XO_BUF_RC_SHIFT          0
+#define REG162_DCO_XO_BUF_RC_MASK           (0xf << REG162_DCO_XO_BUF_RC_SHIFT)
+#define REG162_DCO_XO_BUF_RC(n)             BITFIELD_VAL(REG162_DCO_XO_BUF_RC, n) 
+#define REG162_DCO_XO_BUF_DRV_SHIFT          4
+#define REG162_DCO_XO_BUF_DRV_MASK           (0xff << REG162_DCO_XO_BUF_DRV_SHIFT)
+#define REG162_DCO_XO_BUF_DRV(n)             BITFIELD_VAL(REG162_DCO_XO_BUF_DRV, n) 
+#define REG162_DCO_VD1P8_ISEL_SHIFT          12
+#define REG162_DCO_VD1P8_ISEL_MASK           (0xf << REG162_DCO_VD1P8_ISEL_SHIFT)
+#define REG162_DCO_VD1P8_ISEL(n)             BITFIELD_VAL(REG162_DCO_VD1P8_ISEL, n) 
+
+// REG163
+#define REG163_DCO_LDO_VD1P2REF_SEL_SHIFT       0
+#define REG163_DCO_LDO_VD1P2REF_SEL_MASK       (0xf << REG163_DCO_LDO_VD1P2REF_SEL_SHIFT)
+#define REG163_DCO_LCO_VD1P2REF_SEL(n)          BITFIELD_VAL(REG163_DCO_LCO_VD1P2REF_SEL, n) 
+#define REG163_DCO_LDO_VD1P8REF_SEL_SHIFT       4
+#define REG163_DCO_LDO_VD1P8REF_SEL_MASK       (0x7 << REG163_DCO_LDO_VD1P8REF_SEL_SHIFT)
+#define REG163_DCO_LCO_VD1P8REF_SEL(n)          BITFIELD_VAL(REG163_DCO_LCO_VD1P8REF_SEL, n) 
+#define REG163_DCO_LDO_VD1P2REF_SEL2_SHIFT       7
+#define REG163_DCO_LDO_VD1P2REF_SEL2_MASK       (0xf << REG163_DCO_LDO_VD1P2REF_SEL2_SHIFT)
+#define REG163_DCO_LCO_VD1P2REF_SEL2(n)          BITFIELD_VAL(REG163_DCO_LCO_VD1P2REF_SEL2, n)
+#define REG163_DCO_PU_DLY_SHIFT       11
+#define REG163_DCO_PU_DLY_MASK       (0x3f << REG163_DCO_PU_DLY_SHIFT)
+#define REG163_DCO_PU_DLY(n)          BITFIELD_VAL(REG163_DCO_PU_DLY, n)
+
+// REG164
+#define REG164_CLK_REF_COARSE_DIV_NUM_SHIFT     0
+#define REG164_CLK_REF_COARSE_DIV_NUM_MASK     (0xff << REG164_CLK_REF_COARSE_DIV_NUM_SHIFT)
+#define REG164_CLK_REG_COARSE_DIV_NUM(n)    BITFIELD_VAL(REG164_CLK_REG_COARSE_DIV_NUM, n)
+#define REG164_CLK_REF_FINE_DIV_NUM_SHIFT     8
+#define REG164_CLK_REF_FINE_DIV_NUM_MASK     (0xff << REG164_CLK_REF_FINE_DIV_NUM_SHIFT)
+#define REG164_CLK_REG_FINE_DIV_NUM(n)    BITFIELD_VAL(REG164_CLK_REG_FINE_DIV_NUM, n)
+
+// REG165
+#define REG165_DCO_COARSE_TUN_CODE_DR       (1<<0)
+#define REG165_DCO_COARSE_TUN_CODE_SHIFT    1
+#define REG165_DCO_COARSE_TUN_CODE_MASK     (0x3ff << REG165_DCO_COARSE_TUN_CODE_SHIFT)
+#define REG165_DCO_COARSE_TUN_CODE(n)       BITFIELD_VAL(REG165_DCO_COARSE_TUN_CODE, n)
+#define REG165_DCO_COARSE_POLAR_SEL             (1<<11)
+#define REG165_FINE_POLAR_SEL       (1<<12)
+#define REG165_FILTER_BYPASS            (1<<13)
+#define REG165_SDM_BYPASS               (1<<14)
+
+// REG166
+#define REG166_DCO_FINE_TUN_CODE_DR     (1<<0)
+#define REG166_DCO_FINE_TUN_CODE_SHIFT    1
+#define REG166_DCO_FINE_TUN_CODE_MASK     (0x7ff << REG166_DCO_FINE_TUN_CODE_SHIFT)
+#define REG166_DCO_FINE_TUN_CODE(n)       BITFIELD_VAL(REG166_DCO_FINE_TUN_CODE, n)
+#define REG166_FINE_TUN_SEL_SHIFT    12
+#define REG166_FINE_TUN_SEL_MASK     (0x7 << REG166_FINE_TUN_SEL_SHIFT)
+#define REG166_FINE_TUN_SEL(n)       BITFIELD_VAL(REG166_FINE_TUN_SEL, n)
+
+// REG167
+#define REG167_CNT_COARSE_MARK_15_00_SHIFT    0
+#define REG167_CNT_COARSE_MARK_15_00_MASK    (0xffff << REG167_CNT_COARSE_MARK_15_00_SHIFT)
+#define REG167_CNT_COARSE_MARK_15_00(n)       BITFIELD_VAL(REG167_CNT_COARSE_MARK_15_00, n)
+
+// REG168
+#define REG168_CNT_COARSE_MARK_24_16_SHIFT      0
+#define REG168_CNT_COARSE_MARK_24_16_MASK       (0x1ff << REG168_CNT_COARSE_MARK_24_16_SHIFT)
+#define REG168_CNT_COARSE_MARK_24_16(n)         BITFIELD_VAL(REG168_CNT_COARSE_MARK_24_16, n)
+#define REG168_COEF_SEL_SHIFT              9
+#define REG168_COEF_SEL_MASK               (0x7 << REG168_COEF_SEL_SHIFT)
+#define REG168_COEF_SEL(n)              BITFIELD_VAL(REG168_COEF_SEL, n)
+#define REG168_PRBS_ABS_SHIFT              12
+#define REG168_PRBS_ABS_MASK               (0x3 << REG168_PRBS_ABS_SHIFT)
+#define REG168_PRBS_ABS(n)              BITFIELD_VAL(REG168_PRBS_ABS, n)
+#define REG168_CLK_120M_NEG_EN              (1<<14)
+#define REG168_FINE_TUN_STEP_SHRINK     (1<<15)
+
+// REG169
+#define REG169_FINE_CNT_TIMEOUT_OFF_SHIFT       0
+#define REG169_FINE_CNT_TIMEOUT_OFF_MASK        (0x7fff << REG169_FINE_CNT_TIMEOUT_OFF_SHIFT)
+#define REG169_FINE_CNT_TIMEOUT_OFF(n)          BITFIELD_VAL(REG169_FINE_CNT_TIMEOUT_OFF, n)
+
+// REG16A
+#define REG16A_CNT_FINE_MARK_15_00_SHIFT        0
+#define REG16A_CNT_FINE_MARK_15_00_MASK         (0xffff << REG16A_CNT_FINE_MARK_15_00_SHIFT)
+#define REG16A_CNT_FINE_MARK_15_00(n)           BITFIELD_VAL(REG16A_CNT_FINE_MARK_15_00, n)
+
+// REG16B
+#define REG16B_CNT_FINE_MARK_24_16_SHIFT        0
+#define REG16B_CNT_FINE_MARK_24_16_MASK         (0x1ff << REG16B_CNT_FINE_MARK_24_16_SHIFT)
+#define REG16B_CNT_FINE_MARK_24_16(n)           BITFIELD_VAL(REG16B_CNT_FINE_MARK_24_16, n)
+#define REG16B_ZERO_DETECT_CHANGE               (1<<9)
+#define REG16B_ZERO_DETECT_POWERDOWN        (1<<10)
+#define REG16B_ZERO_DETECT_POWERDOWN_DIRECT     (1<<11)
+#define REG16B_CODEC_TX_PU_ZERODET_L            (1<<12)
+#define REG16B_CODEC_TX_PU_ZERODET_R            (1<<13)
+
+// REG16C
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_L_SHIFT        0
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_L_MASK        (0xf << REG16C_CODEC_TX_EAR_DRE_GAIN_L_SHIFT)
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_L(n)        BITFIELD_VAL(REG16C_CODEC_TX_EAR_DRE_GAIN_L, n)
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_R_SHIFT        4
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_R_MASK        (0xf << REG16C_CODEC_TX_EAR_DRE_GAIN_R_SHIFT)
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_R(n)        BITFIELD_VAL(REG16C_CODEC_TX_EAR_DRE_GAIN_R, n)
+#define REG16C_DRE_GAIN_SEL_L               (1<<8)
+#define REG16C_DRE_GAIN_SEL_R               (1<<9)
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_L_UPD      (1<<10)
+#define REG16C_CODEC_TX_EAR_DRE_GAIN_R_UPD      (1<<11)
+#define REG16C_DCXO_26M_EN                  (1<<12)
+#define REG16C_DCXO_GPIO_SEL                (1<<13)
+#define REG16C_DCXO_DIGIT_RESET         (1<<14)
+#define REG16C_DCXO_COEF_UPD            (1<<15)
+
+// REG16D
+#define REG16D_DCXO_26M_DIV_SHIFT       0
+#define REG16D_DCXO_26M_DIV_MASK        (0xffff << REG16D_DCXO_26M_DIV_SHIFT)
+#define REG16D_DCXO_26M_DIV(n)          BITFIELD_VAL(REG16D_DCXO_26M_DIV, n)
+
+// REG171: (RO)
+#define REG171_DBG_GOAL_CNT_15_00_SHIFT       0
+#define REG171_DBG_GOAL_CNT_15_00_MASK        (0xffff << REG171_DBG_GOAL_CNT_15_00_SHIFT)
+
+// REG172: (RO)
+#define REG172_DBG_GOAL_CNT_24_16_SHIFT     0
+#define REG172_DBG_GOAL_CNT_24_16_MASK      (0x1ff << REG172_DBG_GOAL_CNT_24_16_SHIFT)
+#define REG172_DBG_STATE_SHIFT          9
+#define REG172_DBG_STATE_MASK           (0x7 << REG172_DBG_STATE_SHIFT)
+
+// REG173: (RO)
+#define REG173_DBG_REF_CNT_SHIFT            0
+#define REG173_DBG_REF_CNT_MASK         (0xff << REG173_DBG_REF_CNT_SHIFT)
+#define REG173_DBG_FINE_TUN_STEP_SHIFT            8
+#define REG173_DBG_FINE_TUN_STEP_MASK         (0xff << REG173_DBG_FINE_TUN_STEP_SHIFT)
+
+// REG174: (RO)
+#define REG174_DBG_FINE_TUN_CODE_SHIFT            0
+#define REG174_DBG_FINE_TUN_CODE_MASK         (0x7ff << REG174_DBG_FINE_TUN_CODE_SHIFT)
+#define REG174_DIG_XTAL_DCXO_EN             (1<<11)
+#define REG174_DBG_FINE_TUN_STABLE                (1<<12)
+
+// REG175: (RO)
+#define REG175_DBG_COARSE_TUN_CODE_SHIFT        0
+#define REG175_DBG_COARSE_TUN_CODE_MASK         (0x3ff << REG175_DBG_COARSE_TUN_CODE_SHIFT)
+
+enum ANA_REG_T {
+    ANA_REG_60 = 0x60,
+    ANA_REG_61,
+    ANA_REG_62,
+    ANA_REG_63,
+    ANA_REG_64,
+    ANA_REG_65,
+    ANA_REG_66,
+    ANA_REG_67,
+    ANA_REG_68,
+    ANA_REG_69,
+    ANA_REG_6A,
+    ANA_REG_6B,
+    ANA_REG_6C,
+    ANA_REG_6D,
+    ANA_REG_6E,
+    ANA_REG_6F,
+    ANA_REG_70,
+    ANA_REG_71,
+    ANA_REG_72,
+    ANA_REG_73,
+    ANA_REG_74,
+    ANA_REG_75,
+    ANA_REG_76,
+    ANA_REG_77,
+    ANA_REG_78,
+    ANA_REG_79,
+    ANA_REG_7A,
+    ANA_REG_7B,
+    ANA_REG_7C,
+    ANA_REG_7D,
+    ANA_REG_7E,
+    ANA_REG_7F,
+
+    ANA_REG_160 = 0x160,
+    ANA_REG_161,
+    ANA_REG_162,
+    ANA_REG_163,
+    ANA_REG_164,
+    ANA_REG_165,
+    ANA_REG_166,
+    ANA_REG_167,
+    ANA_REG_168,
+    ANA_REG_169,
+    ANA_REG_16A,
+    ANA_REG_16B,
+    ANA_REG_16C,
+    ANA_REG_16D,
+    ANA_REG_16E,
+    ANA_REG_16F,
+    ANA_REG_170,
+    ANA_REG_171,
+    ANA_REG_172,
+    ANA_REG_173,
+    ANA_REG_174,
+    ANA_REG_175,
+};
+
+
+#ifdef __1801_SUPPT__
+
+// 0x05
+#define REG205_CLK_GPADC_DIV_SHIFT      (0)
+#define REG205_CLK_GPADC_DIV_MASK       (0x1F<<REG205_CLK_GPADC_DIV_SHIFT)
+#define REG205_CLK_GPADC_DIV_SET(reg, val)      (((reg)&(~REG205_CLK_GPADC_DIV_MASK)) | (((val)<<REG205_CLK_GPADC_DIV_SHIFT)&REG205_CLK_GPADC_DIV_MASK))
+
+// 0x08
+#define REG208_PMU_VSEL2_SHIFT      (13)
+#define REG208_PMU_VSEL2_MASK       (0x7 << REG208_PMU_VSEL2_SHIFT)
+#define REG208_PMU_VSEL2(n)         ((n) << REG208_PMU_VSEL2_SHIFT)
+#define REG208_BG_CLK_EN            (1<<12)
+#define REG208_HPPA_CLK_EN          (1<<11)
+#define REG208_EAR_CLK_CP_EN        (1<<10)
+#define REG208_EAR_CLK_EAR_DET_EN   (1<<9)
+#define REG208_EAR_CLK_EAR_RES_EN   (1<<8)
+#define REG208_NCP_CLK_EN           (1<<7)
+#define REG208_GPADC_CLK_EN         (1<<6)
+#define REG208_CLK_LPO_OSC_EN       (1<<5)
+#define REG208_CLK_LPO_SEL          (1<<4)
+#define REG208_CLK_LPO_STABLE_CNT_SHIFT     0
+#define REG208_CLK_LPO_STABLE_CNT_MASK      (0xf << REG208_CLK_LPO_STABLE_CNT_SHIFT)
+#define REG208_CLK_LPO_STABLE_CNT(n)    ((n) << REG208_CLK_LPO_STABLE_CNT_SHIFT)
+
+// 0x0E
+#define REG20E_GPADC_CHAN_EN_SHIFT      (3)
+#define REG20E_GPADC_CHAN_EN_MASK       (0xFF << REG20E_GPADC_CHAN_EN_SHIFT)
+#define REG20E_GPADC_CHAN_EN_SET(reg, val)      (((reg)&(~REG20E_GPADC_CHAN_EN_MASK))|(((val)<<REG20E_GPADC_CHAN_EN_SHIFT)&REG20E_GPADC_CHAN_EN_MASK))
+
+// 0x12, RW
+#define REG212_SAR_VIN_GAIN_SEL_SHIFT           (13)
+#define REG212_SAR_VIN_GAIN_SEL_MASK            (0x7 << REG212_SAR_VIN_GAIN_SEL_SHIFT)
+#define REG212_SAR_VIN_GAIN_SEL(n)          (((n)<<REG212_SAR_VIN_GAIN_SEL_SHIFT)&REG212_SAR_VIN_GAIN_SEL_MASK)
+#define REG212_GPADC_CHAN_DATA_INTR_MASK_SHIFT      2
+#define REG212_GPADC_CHAN_DATA_INTR_MASK_MASK       0xff
+#define REG212_GPADC_CHAN_DATA_INTR_MASK(n)     (((n)&REG212_GPADC_CHAN_DATA_INTR_MASK_MASK)<<REG212_GPADC_CHAN_DATA_INTR_MASK_SHIFT)
+#define REG212_GPADC_SAMPLE_DONE_INTR_MASK      (1<<1)
+#define REG212_GPADC_STATE_RESET                (1<<0)
+
+// 0x14, RW
+#define REG214_PU_CP        (1<<11)
+#define REG214_PU_CP_DR     (1<<10)
+
+// 0x15
+#define REG215_NCP_OCP_11_SHIFT		(12)
+#define REG215_NCP_OCP_11_MASK		((0xf) << REG215_NCP_OCP_11_SHIFT)
+#define REG215_NCP_OCP_11(val)		(((val)<<REG215_NCP_OCP_11_SHIFT)&REG215_NCP_OCP_11_MASK)
+#define REG215_NCP_OCP_10_SHIFT		(8)
+#define REG215_NCP_OCP_10_MASK		((0xf) << REG215_NCP_OCP_10_SHIFT)
+#define REG215_NCP_OCP_10(val)		(((val)<<REG215_NCP_OCP_10_SHIFT)&REG215_NCP_OCP_10_MASK)
+#define REG215_NCP_OCP_01_SHIFT		(4)
+#define REG215_NCP_OCP_01_MASK		((0xf) << REG215_NCP_OCP_01_SHIFT)
+#define REG215_NCP_OCP_01(val)		(((val)<<REG215_NCP_OCP_01_SHIFT)&REG215_NCP_OCP_01_MASK)
+#define REG215_NCP_OCP_00_SHIFT		(0)
+#define REG215_NCP_OCP_00_MASK		((0xf) << REG215_NCP_OCP_00_SHIFT)
+#define REG215_NCP_OCP_00(val)		(((val)<<REG215_NCP_OCP_00_SHIFT)&REG215_NCP_OCP_00_MASK)
+
+// 0x16
+#define REG216_NCP_CP_MODE_SEL_11       (1<<15)
+#define REG216_NCP_CP_MODE_SEL_10       (1<<14)
+#define REG216_NCP_CP_MODE_SEL_01       (1<<13)
+#define REG216_NCP_CP_MODE_SEL_00       (1<<12)
+
+// 0x1D
+#define REG21D_EAR_RES_ENABLE           (1<<10)
+
+// 0x1F
+#define REG21F_EAR_MICBIASA_EN          (1<<13)
+#define REG21F_EAR_VMIC_LDO_EN          (1<<12)
+
+// 0x20
+#define REG220_NCP_OCP_SEL_DR       	(1<<15)
+#define REG220_NCP_CP_MODE_SEL_DR       (1<<14)
+#define REG220_NCP_CLK_SEL_DR       	(1<<13)
+
+
+// 0x25
+#define REG225_NCP_CLK_SEL_00_SHIFT		(13)
+#define REG225_NCP_CLK_SEL_00_MASK		(0x7 << REG225_NCP_CLK_SEL_00_SHIFT)
+#define REG225_NCP_CLK_SEL_00(n)		(((n)<<REG225_NCP_CLK_SEL_00_SHIFT)&REG225_NCP_CLK_SEL_00_MASK)
+#define REG225_NCP_CLK_SEL_01_SHIFT		(10)
+#define REG225_NCP_CLK_SEL_01_MASK		(0x7 << REG225_NCP_CLK_SEL_01_SHIFT)
+#define REG225_NCP_CLK_SEL_01(n)		(((n)<<REG225_NCP_CLK_SEL_01_SHIFT)&REG225_NCP_CLK_SEL_01_MASK)
+
+// 0x26
+#define REG226_NCP_CLK_SEL_10_SHIFT		(13)
+#define REG226_NCP_CLK_SEL_10_MASK		(0x7 << REG226_NCP_CLK_SEL_10_SHIFT)
+#define REG226_NCP_CLK_SEL_10(n)		(((n)<<REG226_NCP_CLK_SEL_10_SHIFT)&REG226_NCP_CLK_SEL_10_MASK)
+#define REG226_NCP_CLK_SEL_11_SHIFT		(10)
+#define REG226_NCP_CLK_SEL_11_MASK		(0x7 << REG226_NCP_CLK_SEL_11_SHIFT)
+#define REG226_NCP_CLK_SEL_11(n)		(((n)<<REG226_NCP_CLK_SEL_11_SHIFT)&REG226_NCP_CLK_SEL_11_MASK)
+
+
+// 0x2b
+#define REG22B_HPPA_IBSEL_SHIFT		12
+#define REG22B_HPPA_IBSEL_MASK		(0x3 << REG22B_HPPA_IBSEL_SHIFT)
+#define REG22B_HPPA_GAIN_SHIFT		10
+#define REG22B_HPPA_GAIN_MASK		(0x3 << REG22B_HPPA_GAIN_SHIFT)
+#define REG22B_HPPA_GAIN(n)			(((n)<<REG22B_HPPA_GAIN_SHIFT)&REG22B_HPPA_GAIN_MASK)
+#define REG22B_HPPA_EN_R            (1<<9)
+#define REG22B_HPPA_EN_L            (1<<7)
+#define REG22B_HPPA_EN_SW_BUFFER    (1<<6)
+#define REG22B_HPPA_EN_BIAS         (1<<1)
+
+// 0x2E
+#define REG22E_HPPA_EN_NEG18_HPPA   (1<<9)
+#define REG22E_HPPA_EN_AVDD_HPPA    (1<<8)
+
+// 0x30
+
+#define REG230_LDO_VMIC_1800MV      0
+#define REG230_LDO_VMIC_3300MV      0xf  // max = 3300mv, step = 100mv
+
+#define REG230_MIC_BIAS_1300MV      0
+#define REG230_MIC_BIAS_3300MV      0x14    // max = 3300mv, step = 100mv
+
+#define REG230_MIC_BIAS_VSEL_SHIFT      (10)
+#define REG230_MIC_BIAS_VSEL_MASK       ((0x1f)<<REG230_MIC_BIAS_VSEL_SHIFT)
+#define REG230_MIC_BIAS_VSEL_SET(reg, val)  (((reg)&(~REG230_MIC_BIAS_VSEL_MASK))|(((val)<<REG230_MIC_BIAS_VSEL_SHIFT)&REG230_MIC_BIAS_VSEL_MASK))
+#define REG230_LDO_VMIC_RES_SHIFT       (0)
+#define REG230_LDO_VMIC_RES_MASK        ((0xf)<<REG230_LDO_VMIC_RES_SHIFT)
+#define REG230_LDO_VMIC_RES_SET(reg, val)   (((reg)&(~REG230_LDO_VMIC_RES_MASK))|(((val)<<REG230_LDO_VMIC_RES_SHIFT)&REG230_LDO_VMIC_RES_MASK))
+
+// 0x31
+#define REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_SHIFT   (0)
+#define REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_MASK    (0xFF<<REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_SHIFT)
+#define REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_SET(reg, val)   \
+    (((reg)&(~REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_MASK))|(((val)<<REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_SHIFT)&REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_MASK))
+
+// 0x32
+#define REG232_HPPA_S1          (1<<15)
+#define REG232_HPPA_S2          (1<<14)
+#define REG232_HPPA_S3          (1<<13)
+
+// 0x33
+#define REG233_PWRON_DIRECT_CTRL        (1<<15)
+
+// 0x35
+#define REG235_HPPA_OC_EN			(1<<6)
+
+// 0x36
+#define REG236_EAR_KEY_DETECT_EN        (1<<15)
+#define REG236_EAR_KEY_DETECT_VTH_SHIFT		(12)
+#define REG236_EAR_KEY_DETECT_VTH_MASK		(0x7 << REG236_EAR_KEY_DETECT_VTH_SHIFT)
+#define REG236_EAR_KEY_DETECT_VTH(n)	(((n) << REG236_EAR_KEY_DETECT_VTH_SHIFT) & REG236_EAR_KEY_DETECT_VTH_MASK)
+
+// 0x37
+#define REG237_EAR_KEY_CHANGE_INTR_MASK     (1<<1)
+#define REG237_EAR_KEY_CHANGE_INTR_EN       (1<<0)
+
+// 0x3D, WX, interrupt clear
+#define REG23D_INTR_CLR_EAR_KEY_CHANGE      (1<<13)
+#define REG23D_INTR_CLR_EAR_PLUG_CHANGE     (1<<12)
+#define REG23D_INTR_CLR_POWER               (1<<11)
+#define REG23D_INTR_CLR_GPADC_CHAN_DATA_SHIFT   3
+#define REG23D_INTR_CLR_GPADC_CHAN_DATA_MASK    0xff
+#define REG23D_INTR_CLR_GPADC_CHAN_DATA(n)  (((n)&REG23D_INTR_CLR_GPADC_CHAN_DATA_MASK)<<REG23D_INTR_CLR_GPADC_CHAN_DATA_SHIFT)
+#define REG23D_INTR_CLR_GPADC_SAMPLE_DONE   (1<<2)
+#define REG23D_INTR_CLR_EAR_DET_FLOW_DONE   (1<<1)
+#define REG23D_INTR_CLR_EAR_RES_FLOW_DONE   (1<<0)
+
+// 0x3E
+#define REG23E_DIRECT_GPADC_START       (1<<10)
+#define REG23E_AUTO_EAR_DETECT          (1<<9)
+#define REG23E_DIRECT_CLOSE_MIC_B       (1<<8)
+#define REG23E_DIRECT_CLOSE_MIC_A       (1<<7)
+#define REG23E_DIRECT_OPEN_MIC_B        (1<<6)
+#define REG23E_DIRECT_OPEN_MIC_A        (1<<5)
+#define REG23E_DIRECT_SWITCH_GND        (1<<4)
+#define REG23E_DIRECT_CLOSE_GND_B       (1<<3)
+#define REG23E_DIRECT_CLOSE_GND_A       (1<<2)
+#define REG23E_DIRECT_OPEN_GND_B        (1<<1)
+#define REG23E_DIRECT_OPEN_GND_A        (1<<0)
+
+
+// 0x3F
+#define REG23F_POWER_ON                 (1<<0)
+
+// 0x41
+#define REG241_EAR_KEY_DETECT           (1<<14)
+#define REG241_EAR_PLUG_EDGE_SEL        (1<<13)
+#define REG241_POWER_ON_FEEDIN          (1<<12)
+#define REG241_EAR_PLUG_DETECT_SEL      (1<<11)
+#define REG241_EAR_PLUG_DETECT_R        (1<<10)
+#define REG241_EAR_PLUG_DETECT_L        (1<<9)
+
+// 0x4A, Read-Only
+#define REG24A_EAR_RES_SECOND_RANGE_SHIFT       (3)
+#define REG24A_EAR_RES_SECOND_RANGE_MASK        (0x3 << REG24A_EAR_RES_SECOND_RANGE_SHIFT)
+#define REG24A_EAR_RES_SECOND_RANGE_GET(reg)    (((reg)&REG24A_EAR_RES_SECOND_RANGE_MASK)>>REG24A_EAR_RES_SECOND_RANGE_SHIFT)
+
+// 0x4D, Read-Only
+#define REG24D_EAR_DETECT_FLOW_DONE     (1<<8)
+#define REG24D_EAR_DETECT_PORT_ERROR    (1<<7)  // no ear detected
+#define REG24D_EAR_DETECT_FOUR_PORT_B   (1<<6)  // four-port OMTP
+#define REG24D_EAR_DETECT_FOUR_PORT_A   (1<<5)  // four-port CTIA
+#define REG24D_EAR_DETECT_THREE_PORT    (1<<4)  // three-port
+#define REG24D_EAR_DETECT_MIC_B_ON      (1<<3)
+#define REG24D_EAR_DETECT_MIC_A_ON      (1<<2)
+#define REG24D_EAR_DETECT_GND_B_ON      (1<<1)
+#define REG24D_EAR_DETECT_GND_A_ON      (1<<0)
+
+
+// 0x4F, Read-Only, interrupt stats
+#define REG24F_INTR_STAT_EAR_KEY_CHANGE          (1<<14)
+#define REG24F_INTR_STAT_EAR_PLUG_CHANGE         (1<<13)
+#define REG24F_INTR_STAT_POWER                   (1<<12)
+#define REG24F_INTR_STAT_GPADC_CHAN_DATA_SHIFT   4
+#define REG24F_INTR_STAT_GPADC_CHAN_DATA_MASK    0xff
+#define REG24F_INTR_STAT_GPADC_SAMPLE_DONE       (1<<3)
+#define REG24F_INTR_STAT_EAR_DETECT_FLOW_DONE    (1<<2)
+#define REG24F_INTR_STAT_EAR_RES_FLOW_DONE       (1<<1)
+#define REG24F_INTR_STAT_PMU                     (1<<0)
+
+#endif
+
+enum ANA_CODEC_USER_T {
+    ANA_CODEC_USER_DAC,
+    ANA_CODEC_USER_ADC,
+
+    ANA_CODEC_USER_CODEC,
+    ANA_CODEC_USER_MICKEY,
+
+#ifdef EXTERN_HEADSET
+    ANA_CODEC_USER_EXT_HS,
+#endif
+
+    ANA_CODEC_USER_QTY
+};
+
+typedef uint8_t CODEC_USER_MAP;
+STATIC_ASSERT(sizeof(CODEC_USER_MAP) * 8 >= ANA_CODEC_USER_QTY, "Invalid codec user map type size");
+
+struct ANALOG_PLL_CFG_T {
+    uint32_t freq;
+    uint8_t div;
+    uint64_t val;
+};
+
+#ifdef ANC_PROD_TEST
+#define OPT_TYPE
+#else
+#define OPT_TYPE                        const
+#endif
+
+#ifdef AUDIO_OUTPUT_DIFF
+static OPT_TYPE uint8_t tx_pa_gain_0db = TX_PA_GAIN_0DB_DIFF;
+#else
+static OPT_TYPE uint8_t tx_pa_gain_0db = TX_PA_GAIN_0DB_SE;
+#endif
+static OPT_TYPE uint16_t vcodec_mv =
+#ifdef VCODEC_1P5V
+    1500;
+#elif defined(VCODEC_1P6V)
+    1600;
+#elif defined(VCODEC_2P5V)
+    2500;
+#elif defined(VCODEC_3P5V)
+    3500;
+#else // VCODEC_1P8V
+    1800;
+#endif
+static OPT_TYPE bool low_power_adc =
+#ifdef LOW_POWER_ADC
+    true;
+#else
+    false;
+#endif
+
+static bool ana_spk_req;
+static bool ana_spk_muted;
+static bool ana_spk_enabled;
+
+static CODEC_USER_MAP adc_map[MAX_ANA_MIC_CH_NUM];
+static CODEC_USER_MAP vmic_1_map;
+static CODEC_USER_MAP vmic_2_map;
+static CODEC_USER_MAP rx_cfg_map;
+static CODEC_USER_MAP vcodec_map;
+
+static uint8_t ana_aud_pll_map;
+STATIC_ASSERT(ANA_AUD_PLL_USER_QTY <= sizeof(ana_aud_pll_map) * 8, "Too many ANA AUD PLL users");
+
+static uint8_t dac_gain;
+
+#ifdef DYN_ADC_GAIN
+static int8_t adc_gain_offset[MAX_ANA_MIC_CH_NUM];
+#endif
+
+//static const uint8_t pga2_qdb[] = { 0, 1.5*4, 3*4, 4.5*4, 6*4, 12*4, 18*4, 24*4, };
+//static const uint8_t pga1_qdb[] = { -1, 0, 6*4, 12*4, 18*4, 24*4, 30*4, 36*4, };
+
+//static const uint8_t tgt_adc_qdb[MAX_ANA_MIC_CH_NUM] = {
+//    ANALOG_ADC_A_GAIN_DB * 4, ANALOG_ADC_B_GAIN_DB * 4,
+//};
+
+// Max allowed total tune ratio (5000ppm)
+#define MAX_TOTAL_TUNE_RATIO                0.005000
+
+//static struct ANALOG_PLL_CFG_T ana_pll_cfg[2];
+//static int pll_cfg_idx;
+
+#ifdef __AUDIO_RESAMPLE__
+static uint16_t xtal_fcap;
+static uint16_t xtal_fvar;
+static uint16_t xtal_tune_factor;
+static int16_t prev_offset;
+static int prev_ppb;
+
+static void analog_init_xtal_fcap(void)
+{
+#if 0
+    xtal_fcap = DEFAULT_XTAL_FCAP;
+    xtal_fvar = DEFAULT_XTAL_FVAR;
+    xtal_tune_factor = DEFAULT_XTAL_TUNE_FACTOR;
+
+    analog_write(ANA_REG_RF_C2, xtal_fcap);
+    analog_write(ANA_REG_RF_EE, xtal_fvar);
+#endif
+}
+
+static void analog_set_xtal_fcap(uint32_t fcap, uint32_t fvar)
+{
+#if 0
+    TRACE("%s: Set xtal fcap: fcap=%u fvar=%u", __func__, fcap, fvar);
+
+    xtal_fcap = SET_BITFIELD(xtal_fcap, REG_XTAL_FCAP_NORMAL, fcap);
+    xtal_fvar = SET_BITFIELD(xtal_fvar, REG_XTAL_FVAR, fvar);
+
+    analog_write(ANA_REG_RF_C2, xtal_fcap);
+    analog_write(ANA_REG_RF_EE, xtal_fvar);
+#endif
+}
+
+static void analog_get_xtal_fcap(uint32_t *fcap, uint32_t *fvar)
+{
+#if 0
+    *fcap = GET_BITFIELD(xtal_fcap, REG_XTAL_FCAP_NORMAL);
+    *fvar = GET_BITFIELD(xtal_fvar, REG_XTAL_FVAR);
+#endif
+}
+
+static void analog_aud_xtal_set_val(uint32_t val)
+{
+#if 0
+    uint32_t fcap, fvar;
+
+    fcap = val >> 3;
+    fvar = (val & 0x7) << 5;
+    analog_set_xtal_fcap(fcap, fvar);
+#endif
+}
+
+static POSSIBLY_UNUSED uint32_t analog_aud_xtal_get_val(void)
+{
+#if 0
+    uint32_t fcap, fvar;
+
+    analog_get_xtal_fcap(&fcap, &fvar);
+    return (fcap << 3) + ((fvar >> 5) & 0x7);
+#endif
+}
+
+void analog_aud_xtal_tune(float ratio)
+{
+#if 0
+    int ppb;
+    int offset;
+    int64_t round;
+    uint32_t old_val, new_val;
+    uint16_t step;
+
+    ppb = FLOAT_TO_PPB_INT(ratio);
+
+    TRACE("\n%s: ppb=%d\n", __FUNCTION__, (int)ppb);
+
+    if (ppb == prev_ppb) {
+        return;
+    }
+
+    step = ABS(prev_offset);
+    if (step > XTAL_TUNE_FACTOR_UPDATE_THRESH) {
+        int new_factor;
+        uint16_t old_factor;
+
+        new_factor = (ppb * 8  - (prev_offset / 2)) / -prev_offset;
+        TRACE("Prepare xtal factor: ppb=%d prev_ppb=%d prev_offset=%d", (int)ppb, (int)prev_ppb, prev_offset);
+        if (new_factor <= 0) {
+            TRACE("WARNING: Bad xtal factor: %d", new_factor);
+            return;
+        }
+
+        old_factor = xtal_tune_factor;
+
+        if (step > XTAL_TUNE_FACTOR_UPDATE_STEP) {
+            step = XTAL_TUNE_FACTOR_UPDATE_STEP;
+        }
+        xtal_tune_factor = (old_factor * (XTAL_TUNE_FACTOR_UPDATE_STEP - step) +
+            new_factor * step + XTAL_TUNE_FACTOR_UPDATE_STEP / 2) / XTAL_TUNE_FACTOR_UPDATE_STEP;
+
+        TRACE("Update xtal factor: old=%u new=%u final=%u", old_factor, new_factor, xtal_tune_factor);
+    }
+
+    round = xtal_tune_factor / 2;
+    if (ppb < 0) {
+        round = -round;
+    }
+
+    offset = -(ppb * 8 + round) / xtal_tune_factor;
+    if (offset != prev_offset) {
+        old_val = (MAX_XTAL_VALUE + 1) / 2;
+        if (offset < 0) {
+            if (old_val > -offset) {
+                new_val = old_val + offset;
+            } else {
+                new_val = 0;
+            }
+        } else {
+            if (old_val + offset < MAX_XTAL_VALUE) {
+                new_val = old_val + offset;
+            } else {
+                new_val = MAX_XTAL_VALUE;
+            }
+        }
+
+        analog_aud_xtal_set_val(new_val);
+        TRACE("Set xtal val: prev_offset=%d offset=%d new_val=%u", prev_offset, offset, new_val);
+
+        prev_offset = offset;
+        prev_ppb = ppb;
+    }
+#endif
+}
+#endif
+
+
+static void analog_aud_enable_vmic(enum ANA_CODEC_USER_T user, uint32_t dev)
+{
+    uint32_t lock;
+    CODEC_USER_MAP old_map;
+    bool set = false;
+
+    lock = int_lock();
+    if (dev & AUD_VMIC_MAP_VMIC1) {
+        if (vmic_1_map == 0) {
+            set = true;
+        }
+        vmic_1_map |= (1 << user);
+    } else {
+        old_map = vmic_1_map;
+        vmic_1_map &= ~(1 << user);
+        if (old_map != 0 && vmic_1_map == 0) {
+            set = true;
+        }
+    }
+
+    if (dev & AUD_VMIC_MAP_VMIC2) {
+        if (vmic_2_map == 0) {
+            set = true;
+        }
+        vmic_2_map |= (1 << user);
+    } else {
+        old_map = vmic_2_map;
+        vmic_2_map &= ~(1 << user);
+        if (old_map != 0 && vmic_2_map == 0) {
+            set = true;
+        }
+    }
+    int_unlock(lock);
+
+    if (set) {
+        uint32_t pmu_map = 0;
+
+        if (vmic_1_map) {
+            pmu_map |= AUD_VMIC_MAP_VMIC1;
+        }
+        if (vmic_2_map) {
+            pmu_map |= AUD_VMIC_MAP_VMIC2;
+        }
+
+#ifdef EXTERN_HEADSET
+        if (pmu_map) {
+            
+            uint16_t val = 0;
+
+            analog1801_read(0x30, &val);
+            val = REG230_MIC_BIAS_VSEL_SET(val, REG230_MIC_BIAS_1300MV+9);
+            val = REG230_LDO_VMIC_RES_SET(val, REG230_LDO_VMIC_3300MV);
+            analog1801_write(0x30, val);
+
+            analog1801_read(0x1F, &val);
+            val |= REG21F_EAR_MICBIASA_EN|REG21F_EAR_VMIC_LDO_EN;
+            analog1801_write(0x1F, val);
+
+			pmu_codec_mic_bias_enable(AUD_VMIC_MAP_VMIC1);
+			
+        } else {
+        
+            uint16_t val = 0;
+
+            analog1801_read(0x1F, &val);
+            val &= ~(REG21F_EAR_MICBIASA_EN|REG21F_EAR_VMIC_LDO_EN);
+            analog1801_write(0x1F, val);
+
+			pmu_codec_mic_bias_enable(0);
+        }
+#else
+        pmu_codec_mic_bias_enable(pmu_map);
+#endif
+        if (pmu_map) {
+            osDelay(1);
+        }
+    }
+}
+
+#ifdef __1801_SUPPT__
+
+#define CHIP1801_CHIP_ID            0x181
+#define CHIP1801_CHIP_ID_SHIFT      4
+#define CHIP1801_CHIP_ID_MASK       0xfff
+
+#define CHIP1801_METAL_ID_SHIFT     0
+#define CHIP1801_METAL_ID_MASK      0xF
+
+#define CHIP1801_RESET_PIN          HAL_IOMUX_PIN_P0_5
+
+void analog1801_reset (uint8_t set)
+{
+    if (set) {
+        hal_gpio_pin_set(CHIP1801_RESET_PIN);
+        return;
+    }
+
+    hal_gpio_pin_clr(CHIP1801_RESET_PIN);
+}
+
+
+#ifdef EXTERN_HEADSET
+
+#define CHIP1801_INTR_DET_PIN       HAL_GPIO_PIN_P0_4
+
+typedef enum {
+    EXT_HS_FSM_ABSENT,     // 1801 absent
+    EXT_HS_FSM_ABNORMAL,   // abnormal status, 
+    EXT_HS_FSM_EXT_HS_DET, // waiting for headset plug-in event
+    EXT_HS_FSM_GND_DET,    // checking whether it is a three-port, CTIA or OMTP headset
+    EXT_HS_FSM_IMP_DET,    // checking the impedence: 32ohm, 64ohm or 600ohm
+    
+    EXT_HS_FSM_WORK,        // waiting for headset plugout, or key dn events
+    EXT_HS_FSM_KEY_UP_WAIT, // waiting for key up
+
+    EXT_HS_FSM_NUM
+
+} EXT_HS_FSM_E;
+
+#define STATIC static
+//#define STATIC
+
+STATIC EXT_HS_FSM_E s_ext_hs_fsm;
+STATIC FUNC_EXT_HS_IRQ_HDL s_ext_hs_state_cb;
+
+STATIC uint32_t s_ext_hs_state;
+STATIC EXT_HS_TYPE_E s_ext_hs_gnd_type;
+STATIC EXT_HS_IMP_TYPE_E s_ext_hs_imp_type;
+STATIC EXT_HS_NOTIFY_EVT_PARAM_U s_ext_hs_evt_param;
+
+static char* s_ext_hs_fsm_debug_str[EXT_HS_FSM_NUM] = {
+    "ABSENT",
+    "ABNORMAL",
+    "EXT_HS_DET",
+    "GND_DET",
+    "IMP_DET",
+    "WORK",
+    "KEY_UP_WAIT"
+};
+
+void analog_ext_hs_irq_hdl_set(FUNC_EXT_HS_IRQ_HDL hdl)
+{
+    if (!s_ext_hs_state_cb && hdl ) {
+
+        // to do the first report
+        if (s_ext_hs_fsm == EXT_HS_FSM_WORK) {
+            s_ext_hs_evt_param.ext_hs_info = s_ext_hs_state;
+            hdl(EXT_HS_NOTIFY_EVT_PLUGIN, s_ext_hs_evt_param);
+        }
+    }
+
+    s_ext_hs_state_cb = hdl;
+}
+
+void analog1801_ext_hs_check (void)
+{
+    uint16_t val = 0;
+
+    TRACE("ext_hs_check: tick[%d], cur_fsm[%s]", hal_sys_timer_get(), s_ext_hs_fsm_debug_str[s_ext_hs_fsm]);
+
+    /*------------------------------------------*/
+    /* to check whether the 3.5mm is on-site */
+    /*------------------------------------------*/
+    analog1801_read(0x41, &val);
+    if ((val & REG241_EAR_PLUG_DETECT_L) && (s_ext_hs_fsm != EXT_HS_FSM_EXT_HS_DET)) {
+        TRACE("==> GET REG[0x41] = 0x%x, 3.5 absent", val);
+
+        analog1801_read(0x4F, &val);
+        TRACE("==> GET REG[0x4F] = 0x%x", val);
+        
+        // to clear all intrs
+        analog1801_write(0x3d, 0xffff);
+        TRACE("==> SET REG0x3D: 0x%x", 0xFFFF);
+        hal_cmu_1801_clock_disable();
+        osDelay(1);
+        
+        s_ext_hs_state = 0;
+        if (EXT_HS_FSM_WORK <= s_ext_hs_fsm) {
+            s_ext_hs_evt_param.ext_hs_info = s_ext_hs_state;
+            s_ext_hs_state_cb(EXT_HS_NOTIFY_EVT_PLUGOUT, s_ext_hs_evt_param);
+        }
+        
+        if ((s_ext_hs_gnd_type == EXT_HS_TYPE_OMTP) || (s_ext_hs_gnd_type == EXT_HS_TYPE_CTIA)) {
+            // to disable MIC_BIAS for the external headset
+            analog_aud_enable_vmic(ANA_CODEC_USER_EXT_HS, 0);
+        }
+        
+        s_ext_hs_fsm = EXT_HS_FSM_EXT_HS_DET;
+        s_ext_hs_gnd_type = EXT_HS_TYPE_NO_HS;
+        s_ext_hs_imp_type = EXT_HS_IMP_UNKNOWN;
+
+        // to reset the 1801
+        analog1801_reset(1);
+        osDelay(16);
+
+
+        analog1801_reset(0);
+        osDelay(16);
+        
+        // to power on 1801 again
+        analog1801_write(0x3F, REG23F_POWER_ON);
+        osDelay(16);
+
+        analog1801_read(0x33, &val);
+        val |= REG233_PWRON_DIRECT_CTRL;
+        analog1801_write(0x33, val);
+        osDelay(1);
+        
+        TRACE("-> FSM update to[%s]", s_ext_hs_fsm_debug_str[s_ext_hs_fsm]);
+      
+        return;
+    }
+
+    if (EXT_HS_FSM_EXT_HS_DET == s_ext_hs_fsm) {
+
+        analog1801_read(0x4F, &val);
+        TRACE("==> GET REG[0x4F] = 0x%x", val);
+
+        if (val & REG24F_INTR_STAT_EAR_PLUG_CHANGE) {
+
+            // to clear all intrs
+            analog1801_write(0x3d, 0xffff);
+            TRACE("==> SET REG0x3D: 0x%x", 0xFFFF);
+
+            osDelay(16);
+
+            // to supply the 8M clock
+            hal_cmu_1801_clock_enable();
+
+            // to set VCM_VSEL
+            analog_read(0x61, &val);
+            val |= REG_CODEC_EN_TX;
+            analog_write(0x61, val);
+            TRACE("==> SET REG0x61(3001): 0x%x", val);
+            
+            analog_read(ANA_REG_6A, &val);
+            val = (val&(~REG_CODEC_VCM_VSEL_MASK))|REG_CODEC_VCM_VSEL(8); 
+            val |= REG_CODEC_EN_VCMLPF;
+            analog_write(ANA_REG_6A, val);
+            TRACE("==> SET REG0x6A(3001): 0x%x", val);
+
+            osDelay(16);
+            
+            // to start GND/MIC detection
+            val = 0x00C0;
+            analog1801_write(0x23, val);
+            TRACE("==> SET REG0x23: 0x%x", val);
+
+            val = 0x20C8;
+            analog1801_write(0x24, val);
+            TRACE("==> SET REG0x24: 0x%x", val);
+            osDelay(1);
+            
+            analog1801_read(0x31, &val);
+            val = REG231_EAR_DETECT_MIC_BIAS_WAIT_NUM_SET(val, 0xff);
+            analog1801_write(0x31, val);
+            TRACE("==> SET REG0x31: 0x%x", val);
+            osDelay(1);
+            
+            analog1801_write(0x3E, REG23E_AUTO_EAR_DETECT); // to start auto_ear_detect
+            TRACE("==> SET REG0x3E: 0x%x", 0x0200);
+            osDelay(1);
+            
+            s_ext_hs_fsm = EXT_HS_FSM_GND_DET;
+            TRACE("-> FSM update to[%s]", s_ext_hs_fsm_debug_str[s_ext_hs_fsm]);
+        }
+        
+        return;
+    } 
+
+    if (EXT_HS_FSM_GND_DET == s_ext_hs_fsm) {
+        /*------------------------------------------*/
+        /*          to check the ground             */
+        /*------------------------------------------*/
+        uint8_t zero_check = 0;
+        
+        analog1801_read(0x50, &val);
+        TRACE("==> GET REG0x50 = 0x%x", val);
+        if (!val) zero_check += 1;
+        
+        analog1801_read(0x51, &val);
+        TRACE("==> GET REG0x51 = 0x%x", val);
+        if (!val) zero_check += 1;
+        
+        analog1801_read(0x52, &val);
+        TRACE("==> GET REG0x52 = 0x%x", val);
+        if (!val) zero_check += 1;
+        
+        analog1801_read(0x53, &val);
+        TRACE("==> GET REG0x53 = 0x%x", val);
+        if (!val) zero_check += 1;
+       
+        analog1801_read(0x4F, &val);
+        TRACE("==> GET REG0x4F = 0x%x", val);
+
+        if ((val & REG24F_INTR_STAT_POWER) && (zero_check == 4)) {
+            analog1801_write(0x3E, 0x0200); // to start auto_ear_detect again
+            TRACE("==> SET REG0x3E: 0x%x", 0x0200);
+            return;
+        }
+        
+        if (val & REG24F_INTR_STAT_EAR_DETECT_FLOW_DONE) {
+
+            analog1801_read(0x4D, &val);
+            TRACE("==> GET REG0x4D = 0x%x", val);
+            
+            if ((val & REG24D_EAR_DETECT_THREE_PORT) == REG24D_EAR_DETECT_THREE_PORT) {
+                TRACE("=> Three Port");
+                s_ext_hs_state = EXT_HS_TYPE_SET(s_ext_hs_state, EXT_HS_TYPE_THREE_PORT);
+                s_ext_hs_gnd_type = EXT_HS_TYPE_THREE_PORT;
+                s_ext_hs_fsm = EXT_HS_FSM_IMP_DET;
+            } else if ((val & REG24D_EAR_DETECT_FOUR_PORT_A) == REG24D_EAR_DETECT_FOUR_PORT_A) { 
+                TRACE("=> CTIA");
+                s_ext_hs_state = EXT_HS_TYPE_SET(s_ext_hs_state, EXT_HS_TYPE_CTIA);
+                s_ext_hs_gnd_type = EXT_HS_TYPE_CTIA;
+                s_ext_hs_fsm = EXT_HS_FSM_IMP_DET;
+
+                analog1801_write(0x3E, REG23E_DIRECT_OPEN_MIC_A);
+                osDelay(20);
+                
+                analog1801_write(0x3E, REG23E_DIRECT_CLOSE_MIC_B);
+                osDelay(20);
+            } else if ((val & REG24D_EAR_DETECT_FOUR_PORT_B) == REG24D_EAR_DETECT_FOUR_PORT_B) {
+                TRACE("=> OMTP");
+                s_ext_hs_state = EXT_HS_TYPE_SET(s_ext_hs_state, EXT_HS_TYPE_OMTP);
+                s_ext_hs_gnd_type = EXT_HS_TYPE_OMTP;
+                s_ext_hs_fsm = EXT_HS_FSM_IMP_DET;
+                
+                analog1801_write(0x3E, REG23E_DIRECT_OPEN_MIC_B);
+                osDelay(20);
+                
+                analog1801_write(0x3E, REG23E_DIRECT_CLOSE_MIC_A);
+                osDelay(20);
+            } else {
+                TRACE("=> UNKNOWN TYPE");
+                s_ext_hs_state = EXT_HS_TYPE_SET(s_ext_hs_state, EXT_HS_TYPE_UNKNOWN);
+                s_ext_hs_gnd_type = EXT_HS_TYPE_UNKNOWN;
+                s_ext_hs_fsm = EXT_HS_FSM_ABNORMAL;
+            }
+            TRACE("==> s_ext_hs_state = %x", s_ext_hs_state);
+
+            // to trigger the impedence detection
+            if (EXT_HS_FSM_IMP_DET == s_ext_hs_fsm) {
+                TRACE("-> to start impedence detection");
+                
+                // to supply the 8M clock
+                hal_cmu_1801_clock_enable();
+
+                analog1801_write(0x27, 0x9608);
+                TRACE("==> SET REG0x27: 0x%x", 0x9608);
+                osDelay(1);
+                
+                analog1801_write(0x28, 0x9608);
+                TRACE("==> SET REG0x28: 0x%x", 0x9608);
+                osDelay(1);
+                
+                analog1801_read(0x12, &val);
+                val &= ~REG212_SAR_VIN_GAIN_SEL_MASK;
+                val |= REG212_SAR_VIN_GAIN_SEL(1);
+                analog1801_write(0x12, val);
+                TRACE("==> SET REG0x12: 0x%x", val);
+                osDelay(1);
+                
+                analog1801_read(0x1D, &val);
+                val &= ~REG21D_EAR_RES_ENABLE;
+                analog1801_write(0x1D, val);
+                TRACE("==> SET REG0x1D: 0x%x", val);
+
+                osDelay(1);
+                val |= REG21D_EAR_RES_ENABLE;
+                analog1801_write(0x1D, val);
+                TRACE("==> SET REG0x1D: 0x%x", val);
+            }
+            
+            TRACE("-> FSM update to[%s]", s_ext_hs_fsm_debug_str[s_ext_hs_fsm]);
+        } 
+
+        // to clear all intrs
+        analog1801_write(0x3d, 0xffff);
+
+        return;
+    }
+
+    if (EXT_HS_FSM_IMP_DET == s_ext_hs_fsm) {
+        /*------------------------------------------*/
+        /*          to check the impedence          */
+        /*------------------------------------------*/
+        analog1801_read(0x4F, &val);
+        TRACE("==> GET REG0x4F = 0x%x", val);
+
+        if (val & REG24F_INTR_STAT_EAR_RES_FLOW_DONE) {
+            analog1801_read(0x4A, &val);
+            TRACE("==> GET REG0x4A = 0x%x", val);
+            
+            switch(REG24A_EAR_RES_SECOND_RANGE_GET(val)) {
+                case 1:     // 600 ohm
+                    TRACE("=> 600 ohm");
+                    s_ext_hs_state = EXT_HS_IMP_TYPE_SET(s_ext_hs_state, EXT_HS_IMP_600_OHM);
+                    s_ext_hs_imp_type = EXT_HS_IMP_600_OHM;
+                    break;
+                case 2:     // 32 ohm
+                    TRACE("=> 32 ohm");
+                    s_ext_hs_state = EXT_HS_IMP_TYPE_SET(s_ext_hs_state, EXT_HS_IMP_32_OHM);
+                    s_ext_hs_imp_type = EXT_HS_IMP_32_OHM;
+                    break;
+                case 0:     // 16 ohm
+                    TRACE("=> 16 ohm");
+                    s_ext_hs_state = EXT_HS_IMP_TYPE_SET(s_ext_hs_state, EXT_HS_IMP_16_OHM);
+                    s_ext_hs_imp_type = EXT_HS_IMP_16_OHM;
+                    break;
+                default:
+                    TRACE("=> unknown impedence");
+                    s_ext_hs_state = EXT_HS_IMP_TYPE_SET(s_ext_hs_state, EXT_HS_IMP_UNKNOWN);
+                    s_ext_hs_imp_type = EXT_HS_IMP_UNKNOWN;
+                    break;
+            }
+        }
+        else {
+/*
+            TRACE("=> unknown impedence");
+            s_ext_hs_state = EXT_HS_IMP_TYPE_SET(s_ext_hs_state, EXT_HS_IMP_UNKNOWN);
+            s_ext_hs_imp_type = EXT_HS_IMP_UNKNOWN;
+*/
+            return;
+        }
+        // to clear all intrs
+        analog1801_write(0x3d, 0xffff);
+        TRACE("==> s_ext_hs_state = %x", s_ext_hs_state);
+        
+        if (s_ext_hs_gnd_type == EXT_HS_TYPE_OMTP || s_ext_hs_gnd_type == EXT_HS_TYPE_CTIA) {
+            TRACE("-> ready for key detection");
+
+#if 0
+            analog1801_read(0x1f, &val);
+            val |= REG21F_EAR_VMIC_LDO_EN | REG21F_EAR_MICBIASA_EN;
+            analog1801_write(0x1f, val);
+            TRACE("==> SET REG0x1f: 0x%x", val);
+#else
+            // to enable MIC_BIAS for the external headset
+            analog_aud_enable_vmic(ANA_CODEC_USER_EXT_HS, AUD_VMIC_MAP_VMIC1);
+#endif
+            osDelay(1);
+            
+            analog1801_read(0x36, &val);
+			val &= ~REG236_EAR_KEY_DETECT_VTH_MASK;
+			val |= REG236_EAR_KEY_DETECT_VTH(6);
+            val |= REG236_EAR_KEY_DETECT_EN;
+            analog1801_write(0x36, val);
+            TRACE("==> SET REG0x36: 0x%x", val);
+            osDelay(1);
+            
+            analog1801_read(0x37, &val);
+            TRACE("==> GET REG0x37: 0x%x", val);
+            val |= REG237_EAR_KEY_CHANGE_INTR_MASK | REG237_EAR_KEY_CHANGE_INTR_EN;
+            analog1801_write(0x37, val);
+            TRACE("==> SET REG0x37: 0x%x", val);
+            osDelay(1);
+            
+            analog1801_write(0x0E, 0x0086);
+            osDelay(1);
+            
+            analog1801_write(0x05, 0x0848);
+            osDelay(1);
+            
+        } else {
+            TRACE("-> nothing to do more");
+            hal_cmu_1801_clock_disable();
+
+            // to disable MIC_BIAS for the external headset
+            analog_aud_enable_vmic(ANA_CODEC_USER_EXT_HS, 0);
+        }
+
+        // to clear all intrs
+        analog1801_write(0x3d, 0xffff);        
+        TRACE("==> SET REG0x3D: 0x%x", 0xffff);
+
+        if (s_ext_hs_state_cb) {
+            s_ext_hs_evt_param.ext_hs_info = s_ext_hs_state;
+            s_ext_hs_state_cb(EXT_HS_NOTIFY_EVT_PLUGIN, s_ext_hs_evt_param);
+        }
+        
+        s_ext_hs_fsm = EXT_HS_FSM_WORK;
+        TRACE("-> FSM update to[%s]", s_ext_hs_fsm_debug_str[s_ext_hs_fsm]);        
+        return;
+    }
+
+
+    if (EXT_HS_FSM_WORK == s_ext_hs_fsm) {
+        analog1801_read(0x4F, &val);
+        TRACE("==> GET REG0x4F = 0x%x", val);
+
+        if ((val & REG24F_INTR_STAT_EAR_KEY_CHANGE) == REG24F_INTR_STAT_EAR_KEY_CHANGE) {
+            analog1801_read(0x41, &val);
+            TRACE("==> GET REG0x41 = 0x%x", val);
+            if ((val & REG241_EAR_KEY_DETECT) != REG241_EAR_KEY_DETECT) {
+
+                uint32_t volt = 0;
+
+                // to trigger GPADC check
+                analog1801_read(0x12, &val);
+                val |= REG212_GPADC_STATE_RESET;
+                analog1801_write(0x12, val);
+                TRACE("==> SET REG0x12: 0x%x", val);
+                
+                osDelay(1);
+                
+                val &= ~REG212_GPADC_STATE_RESET;
+                analog1801_write(0x12, val);
+                TRACE("==> SET REG0x12: 0x%x", val);
+
+                analog1801_read(0x3e, &val);
+                val |= REG23E_DIRECT_GPADC_START;
+                analog1801_write(0x3e, val);
+                TRACE("==> SET REG0x3E: 0x%x", val);
+
+                osDelay(1);
+
+                analog1801_read(0x46, &val);
+                volt = (val*1800)/1024;
+                TRACE("==> GET REG0x46 = 0x%x, volt[%dmv]", val, volt);
+                
+                // TODO: to check the value, and report key-dn
+                // to report the key-up event
+                if (s_ext_hs_state_cb) {
+                    if (volt >= 300) {
+                        s_ext_hs_evt_param.para = EXT_HS_KEY_VOL_MINUS;
+                    } else if (volt >= 100) {
+                        s_ext_hs_evt_param.para = EXT_HS_KEY_VOL_PLUS;
+                    } else {
+                        s_ext_hs_evt_param.para = EXT_HS_KEY_FUNC;
+                    }
+                    s_ext_hs_state_cb(EXT_HS_NOTIFY_EVT_KEY_DN, s_ext_hs_evt_param);
+                }
+
+                s_ext_hs_fsm = EXT_HS_FSM_KEY_UP_WAIT;
+                TRACE("-> FSM update to[%s]", s_ext_hs_fsm_debug_str[s_ext_hs_fsm]);            
+            }
+        }
+        
+        // to clear all intrs
+        analog1801_write(0x3d, 0xffff);    
+        return;
+    }
+
+    if (EXT_HS_FSM_KEY_UP_WAIT == s_ext_hs_fsm) {
+        analog1801_read(0x41, &val);
+        if ((val & REG241_EAR_KEY_DETECT) == REG241_EAR_KEY_DETECT) {
+            // to report the key-up event
+            if (s_ext_hs_state_cb) {
+                s_ext_hs_state_cb(EXT_HS_NOTIFY_EVT_KEY_UP, s_ext_hs_evt_param);
+            }
+            s_ext_hs_fsm = EXT_HS_FSM_WORK;
+            TRACE("-> FSM update to[%s]", s_ext_hs_fsm_debug_str[s_ext_hs_fsm]);            
+        }
+
+        // to clear all intrs
+        analog1801_write(0x3d, 0xffff);
+        TRACE("==> SET REG0x3D: 0x%x", 0xFFFF);
+        return;
+    }
+
+    
+}
+
+void analog1801_ext_hs_irq_hdl (enum HAL_GPIO_PIN_T pin)
+{
+    if (pin != CHIP1801_INTR_DET_PIN) {
+        return;
+    }
+
+    TRACE("%s: ", __func__);
+
+    struct HAL_GPIO_IRQ_CFG_T cfg;
+    
+    cfg.irq_debounce = 1;
+    cfg.irq_enable = 0;
+    cfg.irq_type = HAL_GPIO_IRQ_TYPE_EDGE_SENSITIVE;
+    cfg.irq_handler = NULL;
+    cfg.irq_polarity = 1;
+
+    hal_gpio_setup_irq(CHIP1801_INTR_DET_PIN, &cfg);
+
+    analog1801_ext_hs_check();
+
+    // to clear all intrs
+    analog1801_write(0x3d, 0xffff);
+
+    cfg.irq_enable = 1;
+    cfg.irq_handler = analog1801_ext_hs_irq_hdl;
+
+    hal_gpio_setup_irq(CHIP1801_INTR_DET_PIN, &cfg);
+    
+}
+
+
+#endif
+
+static uint8_t s_ver_1801;
+
+uint8_t analog1801_version (void)
+{
+	return s_ver_1801;
+}
+
+void analog_1801_open ()
+{
+    uint16_t val;
+    
+    struct HAL_IOMUX_PIN_FUNCTION_MAP pin;
+
+    pin.pin = CHIP1801_RESET_PIN;
+    pin.function = HAL_IOMUX_FUNC_GPIO;
+    pin.pull_sel = HAL_IOMUX_PIN_PULLDOWN_ENALBE;
+    pin.volt = HAL_IOMUX_PIN_VOLTAGE_MEM;
+    hal_iomux_init(&pin, 1);
+
+    // to power on 1801
+    analog1801_write(0x3F, REG23F_POWER_ON);
+    osDelay(16);
+
+    hal_gpio_pin_set_dir(CHIP1801_RESET_PIN, HAL_GPIO_DIR_OUT, 1); // 1 for reset
+
+    osDelay(16);
+
+    // to clear the reset on 1801
+    analog1801_reset(0);
+    osDelay(16);
+
+    // to power on 1801 again
+    analog1801_write(0x3F, REG23F_POWER_ON);
+    osDelay(16);
+
+    analog1801_read(0x33, &val);
+    val |= REG233_PWRON_DIRECT_CTRL;
+    analog1801_write(0x33, val);
+    osDelay(1);
+
+    // to check whether 1801 is present
+    analog1801_read(0x00, &val);
+    ASSERT((val>>4) == CHIP1801_CHIP_ID, "failed to init 1801 [%x]", val);
+
+	s_ver_1801 = val&0xf;
+	TRACE("1801 metal id [%d]", s_ver_1801);
+
+	analog1801_read(0x38, &val);
+	val |= (1<<4);
+	analog1801_write(0x38, val);
+
+	analog1801_read(0x3A, &val);
+	val |= (1<<0);
+	analog1801_write(0x3A, val);
+	
+#ifdef EXTERN_HEADSET
+
+    struct HAL_GPIO_IRQ_CFG_T cfg;
+
+    pin.pin = CHIP1801_INTR_DET_PIN;
+    pin.function = HAL_IOMUX_FUNC_GPIO;
+    pin.pull_sel = HAL_IOMUX_PIN_PULLDOWN_ENALBE;
+    pin.volt = HAL_IOMUX_PIN_VOLTAGE_MEM;
+    hal_iomux_init(&pin, 1);
+    hal_gpio_pin_set_dir(CHIP1801_INTR_DET_PIN, HAL_GPIO_DIR_IN, 0);
+
+    cfg.irq_debounce = 1;
+    cfg.irq_enable = 1;
+    cfg.irq_type = HAL_GPIO_IRQ_TYPE_EDGE_SENSITIVE;
+    cfg.irq_handler = analog1801_ext_hs_irq_hdl;
+    cfg.irq_polarity = 1;
+
+    // to clear all intrs
+    analog1801_write(0x3d, 0xffff);
+
+    s_ext_hs_fsm = EXT_HS_FSM_EXT_HS_DET;
+    analog1801_ext_hs_check();
+
+    hal_gpio_setup_irq(CHIP1801_INTR_DET_PIN, &cfg);
+
+#endif
+}
+#endif
+
+
+#ifdef USB_HIGH_SPEED
+static void analog_aud_freq_reset_codec_div(void)
+{
+#if 0
+    uint16_t val;
+
+    // 1) Codec div must be reset if BBPLL is shutdown before
+    // 2) Codec div can be reset only when BBPLL is active (there is a clock)
+
+    analog_read(ANA_REG_RF_1FA, &val);
+    val |= REG_BBPLL_CODECDIV_RST;
+    analog_write(ANA_REG_RF_1FA, val);
+    val &= ~REG_BBPLL_CODECDIV_RST;
+    analog_write(ANA_REG_RF_1FA, val);
+#endif
+}
+#endif
+
+void analog_aud_freq_pll_config(uint32_t freq, uint32_t div)
+{
+#if 0
+    // CODEC_FREQ is likely 24.576M (48K series) or 22.5792M (44.1K series)
+    // PLL_nominal = CODEC_FREQ * CODEC_DIV
+    // PLL_cfg_val = ((CODEC_FREQ * CODEC_DIV) / 26M) * (1 << 28)
+
+    int i, j;
+    uint64_t PLL_cfg_val;
+    uint16_t high, low, bit34_32;
+    uint16_t val;
+
+    if (pll_cfg_idx < ARRAY_SIZE(ana_pll_cfg) &&
+            ana_pll_cfg[pll_cfg_idx].freq == freq &&
+            ana_pll_cfg[pll_cfg_idx].div == div) {
+        return;
+    }
+
+    j = ARRAY_SIZE(ana_pll_cfg);
+    for (i = 0; i < ARRAY_SIZE(ana_pll_cfg); i++) {
+        if (ana_pll_cfg[i].freq == freq && ana_pll_cfg[i].div == div) {
+            break;
+        }
+        if (j == ARRAY_SIZE(ana_pll_cfg) && ana_pll_cfg[i].freq == 0) {
+            j = i;
+        }
+    }
+
+    if (i < ARRAY_SIZE(ana_pll_cfg)) {
+        pll_cfg_idx = i;
+        PLL_cfg_val = ana_pll_cfg[pll_cfg_idx].val;
+    } else {
+        if (j < ARRAY_SIZE(ana_pll_cfg)) {
+            pll_cfg_idx = j;
+        } else {
+            pll_cfg_idx = 0;
+        }
+
+        PLL_cfg_val = ((uint64_t)(1 << 28) * freq * div + 26000000 / 2) / 26000000;
+
+        ana_pll_cfg[pll_cfg_idx].freq = freq;
+        ana_pll_cfg[pll_cfg_idx].div = div;
+        ana_pll_cfg[pll_cfg_idx].val = PLL_cfg_val;
+    }
+
+    low = PLL_cfg_val & 0xFFFF;
+    high = (PLL_cfg_val >> 16) & 0xFFFF;
+    bit34_32 = (PLL_cfg_val >> 32) & 0xFFFF;
+
+#ifdef USB_HIGH_SPEED
+    analog_read(ANA_REG_RF_1FA, &val);
+    val = SET_BITFIELD(val, REG_BBPLL_CODEC_DIVN, div) | REG_BBPLL_CODEC_CLK25M_EN;
+    analog_write(ANA_REG_RF_1FA, val);
+    analog_aud_freq_reset_codec_div();
+
+    analog_write(ANA_REG_RF_D7, low);
+    analog_write(ANA_REG_RF_D6, high);
+    analog_read(ANA_REG_RF_D5, &val);
+    val = SET_BITFIELD(val, REG_BBPLL_FREQ_34_32, bit34_32);
+    analog_write(ANA_REG_RF_D5, val);
+
+    analog_read(ANA_REG_RF_D9, &val);
+    val &= ~REG_BBPLL_FREQ_EN;
+    analog_write(ANA_REG_RF_D9, val);
+    val |= REG_BBPLL_FREQ_EN;
+    analog_write(ANA_REG_RF_D9, val);
+#else
+    analog_read(ANA_REG_65, &val);
+    val = SET_BITFIELD(val, REG_AUDPLL_POST_DIVN, div);
+    analog_write(ANA_REG_65, val);
+
+    analog_write(ANA_REG_67, low);
+    analog_write(ANA_REG_68, high);
+    analog_read(ANA_REG_69, &val);
+    val = SET_BITFIELD(val, REG_AUDPLL_FREQ_34_32, bit34_32) | REG_AUDPLL_FREQ_EN;
+    analog_write(ANA_REG_69, val);
+#endif
+#endif
+}
+
+extern void hal_codec_tune_resample_ppm (int32_t);
+void analog_aud_pll_tune(float ratio)
+{
+#ifdef CHIP_HAS_DCO
+
+	return;
+
+	/*
+		"ppm" less than 0, meaning DCO is slower than 24M and the fine tune code need to get smaller;
+		"ppm" larger than 0, meaning DCO is faster than 24M and the fine tune code need to get larger;
+	*/
+	hal_codec_tune_resample_ppm((int)(ratio * 1000000));
+
+#endif
+
+#if 0
+	/*
+		"sample" less than 0, meaning DCO is slower than 24M;
+		"sample" larger than 0, meaning DCO is faster than 24M;
+	*/
+
+#define FINE_TUNE_UNIT		100		// for fine tuning, 100ppm per unit
+#define PPM_CNT				1000000
+
+	uint32_t sample_per_ms = rate/1000;
+	uint16_t val_ana_166 = 0;
+	uint16_t fine_tune_code = 0;
+
+	int32_t ppm = 0;
+
+	analog_read(ANA_REG_166, &val_ana_166);
+	fine_tune_code = (val_ana_166 & REG166_DCO_FINE_TUN_CODE_MASK) >> REG166_DCO_FINE_TUN_CODE_SHIFT;
+	
+	if (sample < 0) {
+		ppm = (sample - sample_per_ms) / sample_per_ms;
+	} else {
+		ppm = (sample + sample_per_ms) / sample_per_ms;
+	}
+
+	ppm = (ppm * PPM_CNT / FINE_TUNE_UNIT) / ms;
+
+	/*
+		"ppm" less than 0, meaning DCO is slower than 24M and the fine tune code need to get larger;
+		"ppm" larger than 0, meaning DCO is faster than 24M and the fine tune code need to get smaller;
+	*/
+	fine_tune_code -= ppm;
+	val_ana_166 &= ~REG166_DCO_FINE_TUN_CODE_MASK;
+	val_ana_166 |= REG166_FINE_TUN_SEL(fine_tune_code) | REG166_DCO_FINE_TUN_CODE_DR;
+	analog_write(ANA_REG_166, val_ana_166);
+	
+#endif
+
+#if 0//def __AUDIO_RESAMPLE__
+    return;
+#endif
+
+#if 0
+    // CODEC_FREQ is likely 24.576M (48K series) or 22.5792M (44.1K series)
+    // PLL_nominal = CODEC_FREQ * CODEC_DIV
+    // PLL_cfg_val = ((CODEC_FREQ * CODEC_DIV) / 26M) * (1 << 28)
+    // Delta = ((SampleDiff / Fs) / TimeDiff) * PLL_cfg_val
+
+    int64_t delta, new_pll;
+    uint16_t new_high, new_low;
+    uint16_t val, new_bit34_32;
+
+    if (pll_cfg_idx >= ARRAY_SIZE(ana_pll_cfg) ||
+            ana_pll_cfg[pll_cfg_idx].freq == 0) {
+        TRACE("%s: WARNING: aud pll config cache invalid. Skip tuning", __FUNCTION__);
+        return;
+    }
+
+    if (ABS(ratio) > MAX_TOTAL_TUNE_RATIO) {
+        TRACE("\n------\nWARNING: TUNE: ratio=%d is too large and will be cut\n------\n", FLOAT_TO_PPB_INT(ratio));
+        if (ratio > 0) {
+            ratio = MAX_TOTAL_TUNE_RATIO;
+        } else {
+            ratio = -MAX_TOTAL_TUNE_RATIO;
+        }
+    }
+
+    TRACE("%s: ratio=%d", __FUNCTION__, FLOAT_TO_PPB_INT(ratio));
+
+    new_pll = (int64_t)ana_pll_cfg[pll_cfg_idx].val;
+    delta = (int64_t)(new_pll * ratio);
+
+    new_pll += delta;
+
+    new_low = new_pll & 0xFFFF;
+    new_high = (new_pll >> 16) & 0xFFFF;
+    new_bit34_32 = (new_pll >> 32) & 0xFFFF;
+
+#ifdef USB_HIGH_SPEED
+    analog_write(ANA_REG_RF_D7, new_low);
+    analog_write(ANA_REG_RF_D6, new_high);
+    analog_read(ANA_REG_RF_D5, &val);
+    val = SET_BITFIELD(val, REG_BBPLL_FREQ_34_32, new_bit34_32);
+    analog_write(ANA_REG_RF_D5, val);
+
+    analog_read(ANA_REG_RF_D9, &val);
+    val &= ~REG_BBPLL_FREQ_EN;
+    analog_write(ANA_REG_RF_D9, val);
+    val |= REG_BBPLL_FREQ_EN;
+    analog_write(ANA_REG_RF_D9, val);
+#else
+    analog_write(ANA_REG_67, new_low);
+    analog_write(ANA_REG_68, new_high);
+    analog_read(ANA_REG_69, &val);
+    val = SET_BITFIELD(val, REG_AUDPLL_FREQ_34_32, new_bit34_32) | REG_AUDPLL_FREQ_EN;
+    analog_write(ANA_REG_69, val);
+#endif
+#endif
+}
+
+void analog_aud_pll_set_dig_div(uint32_t div)
+{
+#if 0
+    uint16_t val;
+
+#ifdef USB_HIGH_SPEED
+    analog_read(ANA_REG_RF_1EF, &val);
+    val = SET_BITFIELD(val, REG_BBPLL_DIVN_480M, div);
+    analog_write(ANA_REG_RF_1EF, val);
+#else
+    analog_read(ANA_REG_65, &val);
+    val = SET_BITFIELD(val, REG_AUDPLL_DIVN_480M, div);
+    analog_write(ANA_REG_65, val);
+#endif
+#endif
+}
+
+void analog_aud_pll_open(enum ANA_AUD_PLL_USER_T user)
+{
+#if 0
+    enum HAL_CMU_PLL_T pll;
+
+    if (user >= ANA_AUD_PLL_USER_QTY) {
+        return;
+    }
+
+#ifdef __AUDIO_RESAMPLE__
+    if (user == ANA_AUD_PLL_USER_CODEC &&
+            hal_cmu_get_audio_resample_status()) {
+        uint16_t val;
+
+        analog_read(ANA_REG_66, &val);
+        val |= REG_CRYSTAL_SEL_LV | REG_PU_OSC;
+        // Invert tx clock to avoid noise when vcodec=1.8V and vcore=1.1V
+        val |= CFG_TX_CLK_INV;
+        analog_write(ANA_REG_66, val);
+        return;
+    }
+#endif
+
+#ifdef USB_HIGH_SPEED
+    if (user == ANA_AUD_PLL_USER_CODEC) {
+        uint16_t val;
+
+        analog_read(ANA_REG_165, &val);
+        val |= REG_EXTPLL_SEL;
+        analog_write(ANA_REG_165, val);
+    }
+
+    pll = HAL_CMU_PLL_USB;
+#else
+    pll = HAL_CMU_PLL_AUD;
+#endif
+
+    if (ana_aud_pll_map == 0) {
+        hal_cmu_pll_enable(pll, HAL_CMU_PLL_USER_AUD);
+    }
+    ana_aud_pll_map |= (1 << user);
+
+#ifdef USB_HIGH_SPEED
+    if (user == ANA_AUD_PLL_USER_CODEC) {
+        analog_aud_freq_reset_codec_div();
+    }
+#endif
+#endif
+}
+
+void analog_aud_pll_close(enum ANA_AUD_PLL_USER_T user)
+{
+#if 0
+    enum HAL_CMU_PLL_T pll;
+
+    if (user >= ANA_AUD_PLL_USER_QTY) {
+        return;
+    }
+
+#ifdef __AUDIO_RESAMPLE__
+    if (user == ANA_AUD_PLL_USER_CODEC &&
+            hal_cmu_get_audio_resample_status()) {
+        uint16_t val;
+
+        analog_read(ANA_REG_66, &val);
+        val &= ~(REG_CRYSTAL_SEL_LV | REG_PU_OSC | CFG_TX_CLK_INV);
+        analog_write(ANA_REG_66, val);
+        return;
+    }
+#endif
+
+#ifdef USB_HIGH_SPEED
+    if (user == ANA_AUD_PLL_USER_CODEC) {
+        uint16_t val;
+
+        analog_read(ANA_REG_165, &val);
+        val &= ~REG_EXTPLL_SEL;
+        analog_write(ANA_REG_165, val);
+    }
+
+    pll = HAL_CMU_PLL_USB;
+#else
+    pll = HAL_CMU_PLL_AUD;
+#endif
+
+    ana_aud_pll_map &= ~(1 << user);
+    if (ana_aud_pll_map == 0) {
+        hal_cmu_pll_disable(pll, HAL_CMU_PLL_USER_AUD);
+    }
+#endif
+}
+
+static void analog_aud_enable_dac(uint32_t dac)
+{
+    uint16_t val;
+
+    analog_read(ANA_REG_61, &val);
+    val &= ~(REG_CODEC_TX_EN_LDAC | REG_CODEC_TX_EN_RDAC);
+    if (dac & AUD_CHANNEL_MAP_CH0) {
+        val |= REG_CODEC_TX_EN_LDAC;
+    }
+    if (dac & AUD_CHANNEL_MAP_CH1) {
+        val |= REG_CODEC_TX_EN_RDAC;
+    }
+    analog_write(ANA_REG_61, val);
+}
+
+static void analog_aud_enable_dac_pa(uint32_t dac)
+{
+    uint16_t val;
+
+#ifdef __1801_SUPPT__
+#ifndef AUDIO_OUTPUT_DIFF
+	if (!dac) {
+	
+		analog1801_read(0x32, &val);
+		val &= ~REG232_HPPA_S3;
+		analog1801_write(0x32, val);
+		osDelay(2);
+		
+		val &= ~REG232_HPPA_S2;
+		analog1801_write(0x32, val);
+		osDelay(1);
+		
+		analog1801_read(0x2b, &val);
+		val &= ~(REG22B_HPPA_EN_L|REG22B_HPPA_EN_R);
+		analog1801_write(0x2b, val);
+		osDelay(1);
+		
+	}
+#endif
+#endif
+
+    analog_read(ANA_REG_61, &val);
+    val &= ~(REG_CODEC_TX_EN_LEAR | REG_CODEC_TX_EN_REAR);
+    if (dac & AUD_CHANNEL_MAP_CH0) {
+        val |= REG_CODEC_TX_EN_LEAR;
+    }
+    if (dac & AUD_CHANNEL_MAP_CH1) {
+        val |= REG_CODEC_TX_EN_REAR;
+    }
+    analog_write(ANA_REG_61, val);
+
+	if (dac) {
+		
+		analog_read(ANA_REG_65, &val);
+		val |= CFG_TX_EN_LPPA | CFG_TX_EN_LPPA_DR | CFG_TX_EN_DACLDO | CFG_TX_EN_DACLDO_DR | CFG_TX_EN_VTOI | CFG_TX_EN_VTOI_DR;
+		val |= CFG_TX_TREE_EN | CFG_TX_EN_S1PA_DR | CFG_TX_EN_S2PA_DR | CFG_TX_EN_S3PA_DR;
+		val &= ~(CFG_TX_EN_S1PA | CFG_TX_EN_S2PA | CFG_TX_EN_S3PA);
+		analog_write(ANA_REG_65, val);
+
+		osDelay(1);
+		val |= CFG_TX_EN_S1PA;
+		analog_write(ANA_REG_65, val);
+
+		osDelay(2);
+		val |= CFG_TX_EN_S2PA;
+		analog_write(ANA_REG_65, val);
+		
+	} else {
+
+		analog_read(ANA_REG_65, &val);
+		val &= ~CFG_TX_EN_S2PA;
+		analog_write(ANA_REG_65, val);
+	
+		osDelay(1);
+		val &= ~CFG_TX_EN_S1PA;
+		analog_write(ANA_REG_65, val);
+
+	}
+
+#ifdef __1801_SUPPT__
+#ifndef AUDIO_OUTPUT_DIFF
+    if (dac & (AUD_CHANNEL_MAP_CH0|AUD_CHANNEL_MAP_CH1)) {
+
+		hal_cmu_1801_clock_enable();
+		osDelay(1);
+		
+		// to enable the ocp
+		analog1801_read(0x35, &val);
+		val |= REG235_HPPA_OC_EN;
+		analog1801_write(0x35, val);
+
+		// to set the low-pass filter
+		analog1801_read(0x2f, &val);
+		val |= (0x7<<12);
+		analog1801_write(0x2f, val);
+
+        analog1801_read(0x08, &val);
+        val |= REG208_HPPA_CLK_EN | REG208_NCP_CLK_EN;
+        analog1801_write(0x08, val);
+
+        analog1801_read(0x2e, &val);
+        val |= REG22E_HPPA_EN_NEG18_HPPA | REG22E_HPPA_EN_AVDD_HPPA;
+        analog1801_write(0x2e, val);
+
+        analog1801_read(0x14, &val);
+        val |= REG214_PU_CP | REG214_PU_CP_DR;
+        analog1801_write(0x14, val);
+
+#ifdef DAC_CLASSG_ENABLE
+
+		// 3-step ClassG
+
+		analog1801_read(0x20, &val);
+        val &= ~(REG220_NCP_OCP_SEL_DR | REG220_NCP_CP_MODE_SEL_DR | REG220_NCP_CLK_SEL_DR);
+        analog1801_write(0x20, val);		
+
+		// ncp_ocp
+		analog1801_read(0x15, &val);
+		val &= ~REG215_NCP_OCP_01_MASK;
+		val |= REG215_NCP_OCP_01(0x0);	// ncp_ocp_01 = 0x0
+		val &= ~REG215_NCP_OCP_10_MASK;
+		val |= REG215_NCP_OCP_10(0xf);	// ncp_ocp_10 = 0xf
+		val &= ~REG215_NCP_OCP_11_MASK;
+		val |= REG215_NCP_OCP_11(0xf);	// ncp_ocp_11 = 0xf
+		analog1801_write(0x15, val);
+
+		// ncp_cp_mode
+		analog1801_read(0x16, &val);
+		val |= REG216_NCP_CP_MODE_SEL_11;	// ncp_cp_mode_11 = 1
+		val &= ~REG216_NCP_CP_MODE_SEL_10;	// ncp_cp_mode_10 = 0
+		val &= ~REG216_NCP_CP_MODE_SEL_01;	// ncp_cp_mode_01 = 0
+		analog1801_write(0x16, val);
+
+		// ncp_clk
+		analog1801_read(0x25, &val);
+		val &= ~REG225_NCP_CLK_SEL_01_MASK;
+		val |= REG225_NCP_CLK_SEL_01(2);	// ncp_cp_clk_01 = 2;
+		analog1801_write(0x25, val);
+		
+		analog1801_read(0x26, &val);
+		val &= ~REG226_NCP_CLK_SEL_11_MASK;
+		val |= REG226_NCP_CLK_SEL_11(7);	// ncp_cp_clk_11 = 7;
+		val &= ~REG226_NCP_CLK_SEL_10_MASK;
+		val |= REG226_NCP_CLK_SEL_10(7);	// ncp_cp_clk_10 = 7;
+		analog1801_write(0x26, val);
+
+#else
+
+        analog1801_read(0x16, &val);
+        //val &= ~REG216_NCP_CP_MODE_SEL_11;
+        val |= REG216_NCP_CP_MODE_SEL_11;
+        analog1801_write(0x16, val);
+
+		analog1801_read(0x20, &val);
+        val |= REG220_NCP_CP_MODE_SEL_DR;
+        analog1801_write(0x20, val);		
+
+#endif
+
+		osDelay(10);
+
+        analog1801_read(0x2b, &val);
+        val |= REG22B_HPPA_EN_BIAS | REG22B_HPPA_EN_SW_BUFFER;
+        if (dac & AUD_CHANNEL_MAP_CH0) {
+            val |= REG22B_HPPA_EN_L;
+        }
+        if (dac & AUD_CHANNEL_MAP_CH1) {
+            val |= REG22B_HPPA_EN_R;
+        }
+		//val &= ~REG22B_HPPA_GAIN_MASK;
+		val |= REG22B_HPPA_GAIN_MASK;
+		val |= REG22B_HPPA_IBSEL_MASK;
+        analog1801_write(0x2b, val);
+
+		osDelay(1);
+        analog1801_read(0x32, &val);
+		val &= ~REG232_HPPA_S1;
+		analog1801_write(0x32, val);
+
+		osDelay(2);
+        val |= REG232_HPPA_S2;
+        analog1801_write(0x32, val);
+
+		osDelay(4);
+		val |= REG232_HPPA_S3;
+		analog1801_write(0x32, val);
+		
+    } else {
+
+		// to disable the ocp
+		analog1801_read(0x35, &val);
+		val &= ~REG235_HPPA_OC_EN;
+		analog1801_write(0x35, val);
+		
+    }
+#endif
+#endif
+}
+
+static void analog_aud_enable_adc(enum ANA_CODEC_USER_T user, enum AUD_CHANNEL_MAP_T ch_map, bool en)
+{
+    int i;
+    uint16_t val_61, val_62;
+    CODEC_USER_MAP old_map;
+    bool set;
+    bool pga1_en;
+    uint8_t chansel1, chansel2;
+
+    //pga1_en = false;
+    pga1_en = true;
+#if 0
+    if (vcodec_mv < 2500) {
+        if (hal_get_chip_metal_id() < HAL_CHIP_METAL_ID_1) {
+            pga1_en = true;
+        }
+    }
+#endif
+    if (pga1_en) {
+        chansel1 = 1;
+        chansel2 = 1;
+    } else {
+        chansel1 = 0;
+        chansel2 = 2;
+    }
+
+    ANALOG_TRACE("[%s] user=%d ch_map=0x%x", __func__, user, ch_map);
+
+    analog_read(ANA_REG_61, &val_61);
+    analog_read(ANA_REG_62, &val_62);
+
+    for (i = 0; i < MAX_ANA_MIC_CH_NUM; i++) {
+        if (ch_map & (AUD_CHANNEL_MAP_CH0 << i)) {
+            set = false;
+            if (en) {
+                if (adc_map[i] == 0) {
+                    set = true;
+                }
+                adc_map[i] |= (1 << user);
+            } else {
+                old_map = adc_map[i];
+                adc_map[i] &= ~(1 << user);
+                if (old_map != 0 && adc_map[i] == 0) {
+                    set = true;
+                }
+            }
+
+            if (set) {
+                
+                if (adc_map[i]) {
+                    val_61 |= (REG_CODEC_RX_EN_ADCA << i);
+                    val_61 |= (REG_CODEC_PGA2A_EN << (2*i));
+
+                    val_62 = (val_62 & ~((REG_CODEC_PGA1A_CHANSEL_MASK | REG_CODEC_PGA2A_CHANSEL_MASK) << (4*i))) |
+                                ((REG_CODEC_PGA1A_CHANSEL(chansel1) | REG_CODEC_PGA2A_CHANSEL(chansel2)) << 4 * i);
+
+                } else {
+                    val_61 &= ~(REG_CODEC_RX_EN_ADCA << i);
+                    val_61 &= ~((REG_CODEC_PGA1A_EN | REG_CODEC_PGA2A_EN) << 2 * i);
+
+                    val_62 = (val_62 & ~((REG_CODEC_PGA1A_CHANSEL_MASK | REG_CODEC_PGA2A_CHANSEL_MASK) << (4*i))) |
+                                ((REG_CODEC_PGA1A_CHANSEL(0) | REG_CODEC_PGA2A_CHANSEL(0)) << 4 * i);
+                }
+            }
+        }
+    }
+
+    analog_write(ANA_REG_61, val_61);
+    analog_write(ANA_REG_62, val_62);
+}
+
+#if 0
+static uint32_t qdb_to_adc_gain(uint32_t qdb)
+{
+    int i;
+    uint8_t cnt;
+    const uint8_t *list;
+
+    list = pga2_qdb;
+    cnt = ARRAY_SIZE(pga2_qdb);
+
+    for (i = 0; i < cnt - 1; i++) {
+        if (qdb < list[i + 1]) {
+            break;
+        }
+    }
+
+    if (i == cnt - 1) {
+        return i;
+    }
+    else if (qdb * 2 < list[i] + list[i + 1]) {
+        return i;
+    } else {
+        return i + 1;
+    }
+}
+
+static uint16_t get_chan_adc_gain(uint32_t i)
+{
+    uint16_t gain;
+
+    gain = tgt_adc_qdb[i];
+
+#ifdef DYN_ADC_GAIN
+    if (adc_gain_offset[i] < 0 && -adc_gain_offset[i] > gain) {
+        gain = 0;
+    } else {
+        gain += adc_gain_offset[i];
+    }
+#endif
+
+    return gain;
+}
+#endif
+
+static void analog_aud_set_adc_gain(enum AUD_IO_PATH_T input_path, enum AUD_CHANNEL_MAP_T ch_map)
+{
+#if 0
+    int i;
+    uint16_t gain;
+    uint16_t val;
+
+    analog_read(ANA_REG_67, &val);
+    for (i = 0; i < MAX_ANA_MIC_CH_NUM; i++) {
+        if (ch_map & (AUD_CHANNEL_MAP_CH0 << i)) {
+            if (0) {
+            } else if (input_path == AUD_INPUT_PATH_LINEIN) {
+                gain = LINEIN_ADC_GAIN_DB * 4;
+            } else {
+                gain = get_chan_adc_gain(i);
+            }
+            gain = qdb_to_adc_gain(gain);
+            val = (val & ~(REG_PGA2A_GAIN_MASK << 3 * i)) | (REG_PGA2A_GAIN(gain) << 3 * i);
+        }
+    }
+
+	// for test, PGA2A gain is set to max
+	val |= REG_PGA2A_GAIN_MASK;		
+
+    analog_write(ANA_REG_67, val);
+#else
+
+	// only for ss
+
+	uint16_t val;
+
+	// to enable PGA1A & PGA2A
+	analog_read(ANA_REG_61, &val);
+	val |= REG_CODEC_PGA1A_EN | REG_CODEC_PGA2A_EN;
+#ifdef EXTERN_HEADSET
+	val &= ~(REG_CODEC_PGA2B_EN | REG_CODEC_PGA1B_EN);
+#endif
+	analog_write(ANA_REG_61, val);
+
+	// to select PGA_A channels
+	analog_read(ANA_REG_62, &val);
+	val &= ~REG_CODEC_PGA1A_CHANSEL_MASK;
+	val &= ~REG_CODEC_PGA2A_CHANSEL_MASK;
+	val |= REG_CODEC_PGA1A_CHANSEL(1);
+	val |= REG_CODEC_PGA2A_CHANSEL(1);
+	analog_write(ANA_REG_62, val);
+
+	// to set PGA_1A gain
+	analog_read(ANA_REG_66, &val);
+	val &= ~REG_CODEC_PGA1A_CAPMODE;
+	val &= ~REG_CODEC_PGA1A_GAIN_MASK;
+#ifdef EXTERN_HEADSET
+	val &= ~REG_CODEC_PGA1B_CAPMODE;
+	val |= REG_CODEC_PGA1A_GAIN(4);
+#else
+	val |= REG_CODEC_PGA1A_GAIN(5);
+#endif
+	analog_write(ANA_REG_66, val);
+	
+	// to set PGA_2A gain
+	analog_read(ANA_REG_67, &val);
+	val &= ~REG_PGA2A_GAIN_MASK;
+	val |= REG_PGA2A_GAIN(0);
+	analog_write(ANA_REG_67, val);
+
+	{
+		volatile uint32_t* reg = (uint32_t*)0x403000C0;
+		*reg &= ~(0xf<<7);
+		*reg |= (1<<7);
+	}
+#endif
+
+}
+
+#ifdef DYN_ADC_GAIN
+void analog_aud_apply_adc_gain_offset(enum AUD_CHANNEL_MAP_T ch_map, int16_t offset)
+{
+    enum AUD_CHANNEL_MAP_T map;
+    int i;
+
+    if (ch_map) {
+        map = ch_map;
+
+        while (map) {
+            i = get_msb_pos(map);
+            map &= ~(1 << i);
+            if (i < MAX_ANA_MIC_CH_NUM) {
+                adc_gain_offset[i] = offset;
+            }
+        }
+
+        TRACE("ana: apply adc gain offset: ch_map=0x%X offset=%d", ch_map, offset);
+
+        analog_aud_set_adc_gain(AUD_INPUT_PATH_MAINMIC, ch_map);
+    }
+}
+#endif
+
+static void analog_codec_tx_pa_gain_sel(uint32_t v)
+{
+    uint16_t val;
+
+    analog_read(ANA_REG_68, &val);
+    val = SET_BITFIELD(val, REG_CODEC_TX_EAR_GAIN, v);
+    analog_write(ANA_REG_68, val);
+}
+
+void analog_aud_set_dac_gain(int32_t v)
+{
+    if (v < 0) {
+        v = DEFAULT_TX_PA_GAIN;
+    }
+
+    dac_gain = v;
+    analog_codec_tx_pa_gain_sel(v);
+}
+
+uint32_t analog_codec_get_dac_gain(void)
+{
+    uint16_t val;
+
+    analog_read(ANA_REG_68, &val);
+    val = GET_BITFIELD(val, REG_CODEC_TX_EAR_GAIN);
+
+    return val;
+}
+
+uint32_t analog_codec_dac_gain_to_db(int32_t gain)
+{
+    if (gain < 0) {
+        gain = DEFAULT_TX_PA_GAIN;
+    }
+    return (DAC_GAIN_TO_QDB(gain) + 2) / 4;
+}
+
+int32_t analog_codec_dac_max_attn_db(void)
+{
+    return -(DAC_GAIN_TO_QDB(tx_pa_gain_0db) + 2) / 4;
+}
+
+
+static int POSSIBLY_UNUSED dc_calib_checksum_valid(uint16_t efuse)
+{
+    int i;
+    uint32_t cnt = 0;
+
+    for (i = 0; i < 12; i++) {
+        if (efuse & (1 << i)) {
+            cnt++;
+        }
+    }
+
+    return (((~cnt) & 0xF) == ((efuse >> 12) & 0xF));
+}
+
+void analog_aud_get_dc_calib_value(int16_t *dc_l, int16_t *dc_r)
+{
+    static const uint8_t EFUSE_PAGE_DIFF[2] = { PMU_EFUSE_PAGE_DCCALIB2_L, PMU_EFUSE_PAGE_DCCALIB2_R, };
+    //static const uint8_t EFUSE_PAGE_SE[2] = { PMU_EFUSE_PAGE_DCCALIB_L, PMU_EFUSE_PAGE_DCCALIB_R, };
+    const uint8_t *page;
+
+    page = EFUSE_PAGE_DIFF;
+
+#ifdef AUDIO_OUTPUT_DC_CALIB_ANA
+    static const uint16_t DC_VALUE_MASK = 0x03FF;
+#endif
+    uint16_t efuse;
+
+    pmu_get_efuse(page[0], &efuse);
+#ifdef AUDIO_OUTPUT_DC_CALIB_ANA
+    *dc_l = efuse & DC_VALUE_MASK;
+	if (dc_calib_checksum_valid(efuse)) {
+		TRACE("Dc calib L OK: 0x%04x", efuse);
+	} else {
+		TRACE("Warning: Bad dc calib efuse L: 0x%04x", efuse);
+		*dc_l = 0;
+	}
+#endif
+
+    *dc_l = efuse;
+
+    pmu_get_efuse(page[1], &efuse);
+#ifdef AUDIO_OUTPUT_DC_CALIB_ANA
+    *dc_r = efuse & DC_VALUE_MASK;
+	if (dc_calib_checksum_valid(efuse)) {
+		TRACE("Dc calib R OK: 0x%04x", efuse);
+	} else {
+		TRACE("Warning: Bad dc calib efuse R: 0x%04x", efuse);
+		*dc_r = 0;
+	}
+#endif
+
+    *dc_r = efuse;
+
+    TRACE("ANA: DC CALIB L=%d R=%d", *dc_l, *dc_r);
+
+#if defined(ANA_DC_CALIB_L) || defined(ANA_DC_CALIB_R)
+#ifdef ANA_DC_CALIB_L
+    *dc_l = ANA_DC_CALIB_L;
+#endif
+#ifdef ANA_DC_CALIB_R
+    *dc_r = ANA_DC_CALIB_R;
+#endif
+    TRACE("ANA: OVERRIDE DC CALIB L=%d R=%d", *dc_l, *dc_r);
+#endif
+
+    return;
+}
+
+#ifdef AUDIO_OUTPUT_DC_CALIB_ANA
+static void analog_aud_dc_calib_init(void)
+{
+    uint16_t val;
+    int16_t dc_l, dc_r;
+
+    analog_aud_get_dc_calib_value(&dc_l, &dc_r);
+
+    analog_read(ANA_REG_6C, &val);
+    val = SET_BITFIELD(val, REG_CODEC_TX_EAR_OFF_BITL, dc_l);
+    analog_write(ANA_REG_6C, val);
+
+    analog_read(ANA_REG_6B, &val);
+    val = SET_BITFIELD(val, REG_CODEC_TX_EAR_OFF_BITR, dc_r);
+    analog_write(ANA_REG_6B, val);
+}
+
+static void analog_aud_dc_calib_enable(bool en)
+{
+    uint16_t val;
+
+    analog_read(ANA_REG_61, &val);
+
+    if (en) {
+        val |= REG_CODEC_TX_EAR_OFF_EN;
+    } else {
+        val &= ~REG_CODEC_TX_EAR_OFF_EN;
+    }
+
+    analog_write(ANA_REG_61, val);
+}
+#endif
+
+static void analog_aud_vcodec_enable(enum ANA_CODEC_USER_T user, bool en)
+{
+    uint32_t lock;
+    bool set = false;
+
+    lock = int_lock();
+    if (en) {
+        if (vcodec_map == 0) {
+            set = true;
+        }
+        vcodec_map |= (1 << user);
+    } else {
+        vcodec_map &= ~(1 << user);
+        if (vcodec_map == 0) {
+            set = true;
+        }
+    }
+    int_unlock(lock);
+
+    if (set) {
+        pmu_codec_config(!!vcodec_map);
+    }
+}
+
+static void analog_aud_enable_rx_cfg(enum ANA_CODEC_USER_T user, bool en)
+{
+    uint32_t lock;
+    uint16_t val;
+    bool set = false;
+
+    lock = int_lock();
+    if (en) {
+        if (rx_cfg_map == 0) {
+            set = true;
+        }
+        rx_cfg_map |= (1 << user);
+    } else {
+        rx_cfg_map &= ~(1 << user);
+        if (rx_cfg_map == 0) {
+            set = true;
+        }
+    }
+    int_unlock(lock);
+
+    if (set) {
+        analog_read(ANA_REG_62, &val);
+        if (rx_cfg_map) {
+            val |= CFG_EN_RX | CFG_EN_RX_DR;
+        } else {
+            val &= ~(CFG_EN_RX | CFG_EN_RX_DR);
+        }
+        analog_write(ANA_REG_62, val);
+    }
+}
+
+
+void analog_open(void)
+{
+    uint16_t val;
+
+#ifdef __AUDIO_RESAMPLE__
+    if (hal_cmu_get_audio_resample_status()) {
+        analog_init_xtal_fcap();
+    }
+#endif
+
+    // Enable vcm_cap (tx bias)
+    analog_write(ANA_REG_61, REG_CODEC_EN_TX);
+    val = REG_CODEC_TX_DAC_LPFVCM(4);
+    //val = REG_CODEC_TX_DAC_LPFVCM(8);		// zz modified, need further checked, 20190110
+    analog_write(ANA_REG_62, val);
+
+    analog_read(ANA_REG_64, &val);
+    if (low_power_adc) {
+        val = SET_BITFIELD(val, REG_CODEC_RX_IBSEL, 3);
+    } else {
+        val = SET_BITFIELD(val, REG_CODEC_RX_IBSEL, 8);
+    }
+    val = SET_BITFIELD(val, REG_CODEC_ADC_IBSEL, 0xA);
+    val = SET_BITFIELD(val, REG_CODEC_ADC_VREF_SEL, 8);
+    analog_write(ANA_REG_64, val);
+
+#ifdef AUDIO_OUTPUT_DIFF
+    //val = REG_CODEC_TX_DAC_IBSEL(8) | REG_CODEC_TX_DAC_IDAC_SEL(0xB) | REG_CODEC_TX_DAC_VCAS_SEL(0xA);
+    //val = REG_CODEC_TX_DAC_IBSEL(0XC) | REG_CODEC_TX_DAC_IDAC_SEL(0x8) | REG_CODEC_TX_DAC_VCAS_SEL(0xA);
+    //val = REG_CODEC_TX_DAC_IBSEL(0x7) | REG_CODEC_TX_DAC_IDAC_SEL(0xa) | REG_CODEC_TX_DAC_VCAS_SEL(0xA);
+    //val = REG_CODEC_TX_DAC_IBSEL(0xa) | REG_CODEC_TX_DAC_IDAC_SEL(0x9) | REG_CODEC_TX_DAC_VCAS_SEL(0xa);
+	val = REG_CODEC_TX_DAC_IBSEL(8) | REG_CODEC_TX_DAC_IDAC_SEL(0x9) | REG_CODEC_TX_DAC_VCAS_SEL(0xA);
+	//val = REG_CODEC_TX_DAC_IBSEL(0xc) | REG_CODEC_TX_DAC_IDAC_SEL(0x2) | REG_CODEC_TX_DAC_VCAS_SEL(0xA);	// zz modified, need further checked, 20190110
+#else
+	//val = REG_CODEC_TX_DAC_IBSEL(8) | REG_CODEC_TX_DAC_IDAC_SEL(0x5) | REG_CODEC_TX_DAC_VCAS_SEL(0xA);
+	val = REG_CODEC_TX_DAC_IBSEL(0xf) | REG_CODEC_TX_DAC_IDAC_SEL(0x5) | REG_CODEC_TX_DAC_VCAS_SEL(0xA);
+#endif
+    val |= REG_CRYSTAL_SEL_LV;
+    val |= REG_PU_OSC;       
+    analog_write(ANA_REG_63, val);
+
+#ifdef AUDIO_OUTPUT_DIFF
+	//val = REG_CODEC_TX_EAR_IBSEL(3) | REG_CODEC_TX_EAR_GAIN(1);
+	val = REG_CODEC_TX_EAR_IBSEL(2) | REG_CODEC_TX_EAR_GAIN(1);
+	//val = REG_CODEC_TX_EAR_IBSEL(1) | REG_CODEC_TX_EAR_GAIN(2);	// zz modified, need further checked, 20190110
+#else
+	//val = REG_CODEC_TX_EAR_IBSEL(2) | REG_CODEC_TX_EAR_GAIN(2);
+	val = REG_CODEC_TX_EAR_IBSEL(3) | REG_CODEC_TX_EAR_GAIN(2);
+#endif
+#if defined(AUDIO_OUTPUT_DC_CALIB_ANA)
+	val = SET_BITFIELD(val, REG_CODEC_TX_EAR_SOFTSTART, 0x20);
+#endif
+	// val |= REG_CODEC_TX_EAR_OCEN | REG_CODEC_TX_EAR_LPBIAS;	// zz modified, need further checked, 20190110
+    analog_write(ANA_REG_68, val);        
+
+#if 0//ndef AUDIO_OUTPUT_DIFF
+	analog_read(ANA_REG_16C, &val);
+	val &= ~REG16C_CODEC_TX_EAR_DRE_GAIN_L_MASK;
+	val |= REG16C_CODEC_TX_EAR_DRE_GAIN_L(0xD);
+	val &= ~REG16C_CODEC_TX_EAR_DRE_GAIN_R_MASK;
+	val |= REG16C_CODEC_TX_EAR_DRE_GAIN_R(0xD);
+	analog_write(ANA_REG_16C, val);
+#endif
+
+    analog_read(ANA_REG_66, &val);
+    val = (val & ~CFG_PGA_RESETN) | CFG_PGA_RESETN_DR;
+    // Init pga1 gain to 0dB
+    val |= REG_CODEC_PGA1A_GAIN(1) | REG_CODEC_PGA1B_GAIN(1);
+    analog_write(ANA_REG_66, val);
+
+    val = REG_CODEC_ADC_VCM_CLOSE;
+    if (low_power_adc) {
+        val |= REG_ADC_SLOWMODE;
+    }
+    analog_write(ANA_REG_67, val);
+
+    val = REG_CODEC_TX_EAR_OUTPUTSEL(4) | REG_CODEC_VCMBUF_VSEL(4);
+	// val = REG_CODEC_TX_EAR_OUTPUTSEL(4) | REG_CODEC_VCMBUF_VSEL(0);	// zz modified, need further checked, 20190110
+#ifndef VCODEC_OFF
+    if (vcodec_mv == 1500 || vcodec_mv == 1600) {
+        val = SET_BITFIELD(val, REG_CODEC_TX_LDOVSEL, 0x18);
+    } else {
+        val = SET_BITFIELD(val, REG_CODEC_TX_LDOVSEL, 8);
+    }
+#else
+#ifndef AUDIO_OUTPUT_DIFF
+	val = SET_BITFIELD(val, REG_CODEC_TX_LDOVSEL, 6);
+	//val = SET_BITFIELD(val, REG_CODEC_TX_LDOVSEL, 0x4);	// zz modified, need further checked, 20190110
+#else
+	val = SET_BITFIELD(val, REG_CODEC_TX_LDOVSEL, 8);
+#endif
+#endif
+    analog_write(ANA_REG_69, val);
+
+    val = 0;
+    
+    if (vcodec_mv >= 2500) {
+        val |= REG_CODEC_VCM_VSEL(8);
+    } else {
+        val |= REG_CODEC_VCM_VSEL(0);
+    }
+    
+    if (vcodec_mv < 2500) {
+        // It takes 50ms for vcm_cap to ramp up to 0.65V.
+        // The 50ms interval cannot be changed for vcodec=1.6V and reg75=0x6000.
+        // If the interval is longer, the voltage will be higher, which means extra stable time is needed.
+        osDelay(50);
+        val |= REG_CODEC_EN_VCMLPF;
+        val = SET_BITFIELD(val, REG_CODEC_VCMBUF_LOWP, 1);
+        val = SET_BITFIELD(val, REG_CODEC_VCM_VSEL, 0xF);
+        if (vcodec_mv == 1500 || vcodec_mv == 1600) {
+            val |= REG_CODEC_ADC_VREFP_CLOSE;
+        }
+    }
+    
+    analog_write(ANA_REG_6A, val);
+
+#ifdef AUDIO_OUTPUT_DC_CALIB_ANA
+    analog_aud_dc_calib_init();
+    analog_aud_dc_calib_enable(true);
+#endif
+
+#if defined(DCO_XO_BUF_DRV) || defined(DCO_XO_BUF_RC)
+	analog_read(ANA_REG_162, &val);
+#ifdef DCO_XO_BUF_DRV
+	val &= ~REG162_DCO_XO_BUF_DRV_MASK;
+	val |= REG162_DCO_XO_BUF_DRV(DCO_XO_BUF_DRV);
+#endif
+#ifdef DCO_XO_BUF_RC
+	val &= ~REG162_DCO_XO_BUF_RC_MASK;
+	val |= REG162_DCO_XO_BUF_RC(DCO_XO_BUF_RC);
+#endif
+	analog_write(ANA_REG_162, val);
+#endif
+
+
+#ifdef __1801_SUPPT__
+    analog_1801_open();
+#endif
+}
+
+//#define FACT_DCO_TUNE
+
+uint8_t is_3001s_chip_d (void)
+{
+	uint32_t* reg = (uint32_t*)0x4000d000;
+
+	return ((*reg&0xf)>=2)?1:0;
+}
+
+
+#ifdef CHIP_HAS_DCO
+#ifdef FACT_DCO_TUNE
+extern uint8_t fact_sect_set_dco_fine_tune_code (uint16_t code, uint8_t usr);
+extern uint8_t fact_sect_get_dco_fine_tune_code (uint16_t* pcode);
+#endif
+
+void analog_set_dco_fine_tune_code (uint8_t with_temp_calib)
+{
+	uint16_t val;
+
+	val = hal_get_chip_metal_id();
+	TRACE("METAL_ID: %d", val);
+	if (val >= 1) {
+		
+		uint16_t val_ana_7c = 0;
+		uint16_t val_ana_7b = 0; 
+		uint16_t val_ana_16c = 0;
+		uint16_t val_ana_16d = 0;
+		uint16_t val_ana_166 = 0;
+		uint16_t val_ana_169 = 0;
+		
+		uint16_t val_ana_165 = 0;
+
+		analog_read(ANA_REG_7B, &val_ana_7b);
+		analog_read(ANA_REG_7C, &val_ana_7c);
+		analog_read(ANA_REG_16D, &val_ana_16d);
+		analog_read(ANA_REG_16C, &val_ana_16c);
+		analog_read(ANA_REG_166, &val_ana_166);
+		analog_read(ANA_REG_169, &val_ana_169);
+
+		// to disable fine tuning
+		val_ana_7c |= REG07C_FINE_EN_DR;
+		val_ana_7c &= ~REG07C_FINE_EN;
+		analog_write(ANA_REG_7C, val_ana_7c);
+
+		// to get fine tuning code
+		pmu_get_efuse(0x0E, &val);
+		TRACE("GET EFUSE_E: 0x%x", val);
+
+#ifdef FACT_DCO_TUNE
+		val = 0;
+		if (!val) {
+			fact_sect_get_dco_fine_tune_code(&val);
+		}
+#endif
+
+#ifdef DCO_FINE_TUNE_CODE
+		val = DCO_FINE_TUNE_CODE;	// 31#
+#endif
+
+		// to make sure the fine tuning code is available
+		if ((val & 0x800) || (val)) {
+
+			val &= 0x7ff;
+#if defined(CHIP_HAS_TEMP_SNSR) 
+			if (with_temp_calib) {
+				pmu_dco_temp_calib(&val);
+			}
+#endif
+			
+			val_ana_16c |= REG16C_DCXO_DIGIT_RESET;
+			analog_write(ANA_REG_16C, val_ana_16c);
+			osDelay(1);
+			val_ana_16c &= ~REG16C_DCXO_DIGIT_RESET;
+			analog_write(ANA_REG_16C, val_ana_16c);
+
+			val_ana_166 &= ~REG166_DCO_FINE_TUN_CODE_MASK;
+			val_ana_166 |= REG166_DCO_FINE_TUN_CODE(val);
+			val_ana_166 |= REG166_DCO_FINE_TUN_CODE_DR;
+			analog_write(ANA_REG_166, val_ana_166);
+
+			analog_write(ANA_REG_16D, 0);
+			analog_write(ANA_REG_169, 0);
+
+			analog_read(ANA_REG_165, &val_ana_165);
+			val_ana_165 |= REG165_FILTER_BYPASS | REG165_SDM_BYPASS; 	// filter bypass & sdm bypass
+			analog_write(ANA_REG_165, val_ana_165);
+
+			// to do IOMUX on GPIO00
+			if (!is_3001s_chip_d()) {
+
+				// to enable 26M tuning from GPIO00
+				val_ana_16c |= REG16C_DCXO_GPIO_SEL | REG16C_DCXO_26M_EN;
+				analog_write(ANA_REG_16C, val_ana_16c);
+				
+				// to enable fine tuning
+				val_ana_7c |= REG07C_FINE_EN;
+				analog_write(ANA_REG_7C, val_ana_7c);
+				
+				// to generate pulse on GPIO00
+				volatile uint8_t rpts = 30;
+				struct HAL_IOMUX_PIN_FUNCTION_MAP map;
+				
+				map.pin = HAL_IOMUX_PIN_P0_0;
+				map.function = HAL_IOMUX_FUNC_GPIO;
+				map.pull_sel = HAL_IOMUX_PIN_PULLUP_ENALBE;
+				map.volt = HAL_IOMUX_PIN_VOLTAGE_MEM;
+
+				hal_iomux_init(&map, 1);
+				hal_gpio_pin_set_dir(HAL_GPIO_PIN_P0_0, HAL_GPIO_DIR_OUT, 1);
+				
+				do {
+					hal_gpio_pin_clr(HAL_GPIO_PIN_P0_0);
+					//hal_sys_timer_delay(8);
+					hal_sys_timer_delay(1);
+
+					hal_gpio_pin_set(HAL_GPIO_PIN_P0_0);
+					//hal_sys_timer_delay(8);
+					hal_sys_timer_delay(1);
+				} 
+				while(--rpts);
+
+				// to disable fine tuning
+				val_ana_7c &= ~REG07C_FINE_EN;
+				analog_write(ANA_REG_7C, val_ana_7c);
+
+				hal_gpio_pin_clr(HAL_GPIO_PIN_P0_0);
+
+				//analog_write(ANA_REG_166, val_ana_166);
+				analog_write(ANA_REG_169, val_ana_169);
+				analog_write(ANA_REG_16D, val_ana_16d);
+
+				// to disable 24M tuning
+				val_ana_16c &= ~(REG16C_DCXO_GPIO_SEL | REG16C_DCXO_26M_EN);
+				analog_write(ANA_REG_16C, val_ana_16c);
+				
+			}
+
+
+#if 0
+			// to mux GPIO01 to CLK_OUT
+			*((uint32_t*)0x4000d004) &= ~(0xf<<4);
+			*((uint32_t*)0x4000d004) |= (5<<4);
+			// to set the clk_out to 24M
+			*((uint32_t*)0x40000070) = 0x3;
+#endif
+
+
+		}
+	}
+	
+	analog_read(ANA_REG_7E, &val);
+#ifdef RELIABLITY_TEST
+	val |= REG07E_DCO_RBN_TUN_MASK;
+	val |= REG07E_DCO_RBP_TUN_MASK;
+#else
+	val &= ~REG07E_DCO_RBN_TUN_MASK;
+//	val |= REG07E_DCO_RBN_TUN(4);
+	val |= REG07E_DCO_RBN_TUN(6);
+	val &= ~REG07E_DCO_RBP_TUN_MASK;
+//	val |= REG07E_DCO_RBP_TUN(4);
+	val |= REG07E_DCO_RBP_TUN(6);
+#endif
+	analog_write(ANA_REG_7E, val);
+
+	// to disable the test buffer
+	analog_read(ANA_REG_7C, &val);
+	val |= REG07C_DCO_TST_BUF_RCTRL_DR;
+	analog_write(ANA_REG_7C, val);
+
+	analog_read(ANA_REG_7B, &val);
+	val &= ~REG07B_DCO_TST_BUF_RCTRL_MASK;
+	val |= REG07B_DCO_TST_BUF_RCTRL(0);
+	analog_write(ANA_REG_7B, val);
+
+#ifdef RELIABLITY_TEST
+	analog_read(ANA_REG_162, &val);
+	val |= REG162_DCO_VD1P8_ISEL_MASK;
+	analog_write(ANA_REG_162, val);
+#endif
+
+#if defined(USB_HIGH_SPEED)
+	extern void analog_dcxo_enable_hs_mode(void);
+	analog_dcxo_enable_hs_mode();
+#endif
+}
+#endif
+
+void analog_sleep(void)
+{
+    // For vcodec lower than 2.5V, vcodec is powered off and shorted with vana.
+    // Since vana is always powered on, vcm_cap can be always enabled to reduce the DAC PA stable time.
+    // Note that deep-sleep vana is 1.1V, whereas active vana is 1.6V or 1.8V. So even if vcm_cap
+    // is always enabled, it still needs some stable time.
+
+    // Vcm_cap off --> save deep sleep current
+    // Vcm_cap on  --> reduce DAC PA stable time
+
+    if (vcodec_mv >= 2500) {
+        uint16_t val;
+
+        // Disable vcm_cap (tx bias)
+        analog_read(ANA_REG_61, &val);
+        val &= ~REG_CODEC_EN_TX;
+        analog_write(ANA_REG_61, val);
+    }
+}
+
+void analog_wakeup(void)
+{
+    if (vcodec_mv >= 2500) {
+        uint16_t val;
+
+        // Enable vcm_cap (tx bias)
+        analog_read(ANA_REG_61, &val);
+        val |= REG_CODEC_EN_TX;
+        analog_write(ANA_REG_61, val);
+    }
+}
+
+void analog_aud_codec_anc_enable(enum ANC_TYPE_T type, bool en)
+{
+
+
+}
+
+void analog_aud_codec_anc_init_close(void)
+{
+
+}
+
+void analog_aud_mickey_enable(bool en)
+{
+    if (en) {
+        analog_aud_vcodec_enable(ANA_CODEC_USER_MICKEY, true);
+        analog_aud_enable_rx_cfg(ANA_CODEC_USER_MICKEY, true);
+        analog_aud_enable_vmic(ANA_CODEC_USER_MICKEY, CFG_HW_AUD_MICKEY_DEV);
+    } else {
+        analog_aud_enable_vmic(ANA_CODEC_USER_MICKEY, 0);
+        analog_aud_enable_rx_cfg(ANA_CODEC_USER_MICKEY, false);
+        analog_aud_vcodec_enable(ANA_CODEC_USER_MICKEY, false);
+    }
+}
+
+void analog_aud_codec_adc_enable(enum AUD_IO_PATH_T input_path, enum AUD_CHANNEL_MAP_T ch_map, bool en)
+{
+    uint32_t dev;
+
+    if (en) {
+        dev = hal_codec_get_input_path_cfg(input_path);
+        analog_aud_enable_rx_cfg(ANA_CODEC_USER_ADC, true);
+        analog_aud_enable_vmic(ANA_CODEC_USER_ADC, dev);
+        analog_aud_set_adc_gain(input_path, ch_map);
+        analog_aud_enable_adc(ANA_CODEC_USER_ADC, ch_map, true);
+    } else {
+        analog_aud_enable_adc(ANA_CODEC_USER_ADC, ch_map, false);
+        analog_aud_enable_vmic(ANA_CODEC_USER_ADC, 0);
+        analog_aud_enable_rx_cfg(ANA_CODEC_USER_ADC, false);
+    }
+}
+
+static void analog_aud_codec_config_speaker(void)
+{
+    bool en;
+
+    if (ana_spk_req && !ana_spk_muted) {
+        en = true;
+    } else {
+        en = false;
+    }
+
+    if (ana_spk_enabled != en) {
+        ana_spk_enabled = en;
+        if (en) {
+            analog_aud_enable_dac_pa(CFG_HW_AUD_OUTPUT_PATH_SPEAKER_DEV);
+
+
+#if 0//defined(AUDIO_OUTPUT_DC_CALIB_ANA)
+            uint16_t val;
+            int ret;
+            ret = hal_codec_dac_reset_set();
+            analog_read(ANA_REG_65, &val);
+            val |= CFG_TX_EN_S2PA;
+            analog_write(ANA_REG_65, val);
+            if (ret) {
+                hal_codec_dac_reset_clear();
+            }
+#endif
+
+#ifdef CFG_HW_AUD_OUTPUT_POP_SWITCH
+            hal_sys_timer_delay_us(5);
+            hal_gpio_pin_set(CFG_HW_AUD_OUTPUT_POP_SWITCH);
+#endif
+        } else {
+#if 0//defined(AUDIO_OUTPUT_DC_CALIB_ANA)
+            uint16_t val;
+            analog_read(ANA_REG_65, &val);
+            val &= ~CFG_TX_EN_S2PA;
+            analog_write(ANA_REG_65, val);
+#endif
+
+            analog_aud_enable_dac_pa(0);
+
+#ifdef CFG_HW_AUD_OUTPUT_POP_SWITCH
+            hal_gpio_pin_clr(CFG_HW_AUD_OUTPUT_POP_SWITCH);
+#endif
+        }
+    }
+}
+
+void analog_aud_codec_speaker_enable(bool en)
+{
+    ana_spk_req = en;
+    analog_aud_codec_config_speaker();
+}
+
+void analog_aud_codec_dac_enable(bool en)
+{
+    uint16_t val;
+
+    if (en) {
+#if 0
+        analog_aud_enable_rx_cfg(ANA_CODEC_USER_DAC, true);
+
+        analog_read(ANA_REG_65, &val);
+
+        val = CFG_TX_EN_LPPA_DR | CFG_TX_EN_S1PA | CFG_TX_EN_S1PA_DR |
+            CFG_TX_EN_S2PA_DR | CFG_TX_EN_S3PA | CFG_TX_EN_S3PA_DR |
+            CFG_TX_EN_DACLDO | CFG_TX_EN_DACLDO_DR | CFG_TX_EN_VTOI | CFG_TX_EN_VTOI_DR;
+#if 0
+#if defined(AUDIO_OUTPUT_DC_CALIB_ANA)
+        val |= CFG_TX_EN_LPPA;
+#else
+        val |= CFG_TX_EN_S2PA;
+#endif
+		val |= CFG_TX_TREE_EN;
+#else
+        val |= CFG_TX_EN_LPPA | CFG_TX_EN_S2PA | CFG_TX_TREE_EN;	// zz modified, need further checked, 20190110
+#endif
+
+        analog_write(ANA_REG_65, val);
+#endif
+
+	// zz 190122
+	analog_read(ANA_REG_68, &val);
+    val |= REG_CODEC_TX_EAR_ENBIAS;
+	val |= REG_CODEC_TX_EAR_OCEN;	// over-current protection
+    analog_write(ANA_REG_68, val);
+
+	analog_aud_enable_dac(CFG_HW_AUD_OUTPUT_PATH_SPEAKER_DEV);
+
+#if !defined(AUDIO_OUTPUT_DC_CALIB_ANA) && !defined(AUDIO_OUTPUT_DC_CALIB)
+    osDelay(1);
+    analog_aud_codec_speaker_enable(true);
+#endif
+	
+
+    } else {
+#if !defined(AUDIO_OUTPUT_DC_CALIB_ANA) && !defined(AUDIO_OUTPUT_DC_CALIB)
+        analog_aud_codec_speaker_enable(false);
+        osDelay(1);
+#endif
+
+        analog_aud_enable_dac(0);
+
+        analog_read(ANA_REG_65, &val);
+        val = 0;
+        analog_write(ANA_REG_65, val);
+
+        analog_read(ANA_REG_68, &val);
+        val &= ~REG_CODEC_TX_EAR_ENBIAS;
+        analog_write(ANA_REG_68, val);
+
+        analog_aud_enable_rx_cfg(ANA_CODEC_USER_DAC, false);
+    }
+}
+
+void analog_aud_codec_open(void)
+{
+    TRACE("%s: vcodec_mv[%d]", __func__, vcodec_mv);
+
+    analog_aud_vcodec_enable(ANA_CODEC_USER_CODEC, true);
+
+#ifdef _AUTO_SWITCH_POWER_MODE__
+    // pmu_mode_change(PMU_POWER_MODE_DIG_DCDC);
+#endif
+
+#if 0
+    // vcodec >  1.8V: vcm_cap is charged by vcodec and DAC PA needs some stable time each time vcodec is powered on
+    // vcodec <= 1.8V: vcm_cap is charged by vana (vcodec is powered off and shorted with vana) and DAC PA needs the
+    //                 stable time only at system startup and wakeup from deep sleep (vana is never powered off)
+
+    if (vcodec_mv >= 2500) {
+        uint16_t val;
+
+        // Wait for vcm_cap fast charge finished
+        osDelay(80);
+
+        analog_read(ANA_REG_6A, &val);
+        val |= REG_CODEC_EN_VCMLPF;
+        val = SET_BITFIELD(val, REG_CODEC_VCMBUF_LOWP, 1);
+        val = SET_BITFIELD(val, REG_CODEC_VCM_VSEL, 8);
+        analog_write(ANA_REG_6A, val);
+    }
+#endif
+
+	// zz 20190122
+	
+	uint16_t val;
+
+	analog_aud_enable_rx_cfg(ANA_CODEC_USER_DAC, true);
+	analog_read(ANA_REG_6A, &val);
+	val &= ~REG_CODEC_EN_VCMLPF;		// to set VCM_VSEL, fast mode
+	val = SET_BITFIELD(val, REG_CODEC_VCMBUF_LOWP, 1);
+    val = SET_BITFIELD(val, REG_CODEC_VCM_VSEL, 8);
+	analog_write(ANA_REG_6A, val);
+	osDelay(3);
+	
+	val |= REG_CODEC_EN_VCMLPF;		// to set VCM_VSEL, slow mode
+	analog_write(ANA_REG_6A, val);
+	osDelay(8);
+
+}
+
+void analog_aud_codec_close(void)
+{
+    static const enum AUD_CHANNEL_MAP_T all_ch = AUD_CHANNEL_MAP_CH0 | AUD_CHANNEL_MAP_CH1;
+
+    analog_aud_codec_speaker_enable(false);
+    osDelay(1);
+    analog_aud_codec_dac_enable(false);
+
+    analog_aud_codec_adc_enable(AUD_IO_PATH_NULL, all_ch, false);
+
+    if (vcodec_mv >= 2500) {
+        uint16_t val;
+
+        // Set vcm_cap to fast charge mode
+        analog_read(ANA_REG_6A, &val);
+        val &= ~(REG_CODEC_EN_VCMLPF | REG_CODEC_VCMBUF_LOWP_MASK | REG_CODEC_VCM_VSEL_MASK | REG_CODEC_ADC_VREFP_CLOSE);
+        val |= REG_CODEC_VCM_VSEL(8);
+        analog_write(ANA_REG_6A, val);
+    }
+
+#ifdef _AUTO_SWITCH_POWER_MODE__
+    // pmu_mode_change(PMU_POWER_MODE_ANA_DCDC);
+#endif
+
+    analog_aud_vcodec_enable(ANA_CODEC_USER_CODEC, false);
+}
+
+void analog_aud_codec_mute(void)
+{
+#ifndef AUDIO_OUTPUT_DC_CALIB
+    //analog_codec_tx_pa_gain_sel(0);
+#endif
+
+    ana_spk_muted = true;
+    analog_aud_codec_config_speaker();
+}
+
+void analog_aud_codec_nomute(void)
+{
+    ana_spk_muted = false;
+    analog_aud_codec_config_speaker();
+
+#ifndef AUDIO_OUTPUT_DC_CALIB
+    analog_aud_set_dac_gain(dac_gain);
+#endif
+}
+
+int analog_debug_config_audio_output(bool diff)
+{
+    return 0;
+}
+
+int analog_debug_config_codec(uint16_t mv)
+{
+
+    return 0;
+}
+
+int analog_debug_config_low_power_adc(bool enable)
+{
+    return 0;
+}
+
+#if 0
+void BOOT_TEXT_SRAM_LOC analog_oscx2_enable (uint8_t enable)
+{
+    uint16_t val = 0;
+
+    if (enable) {
+
+        analog_read(ANA_REG_71, &val);
+        val &= ~REG071_DBL_FREQ_SEL;
+        analog_write(ANA_REG_71, val);
+
+        analog_read(ANA_REG_70, &val);
+        val |= REG070_DIG_DBL_EN;
+        analog_write(ANA_REG_70, val);
+
+        hal_sys_timer_delay(US_TO_TICKS(100));
+
+        val &= ~REG070_DIG_DBL_RST;
+        analog_write(ANA_REG_70, val);
+        
+    } else {
+    
+        analog_read(ANA_REG_70, &val);
+        val &= ~REG070_DIG_DBL_EN;
+        analog_write(ANA_REG_70, val);
+
+    }
+}
+
+void BOOT_TEXT_SRAM_LOC analog_oscx4_enable (uint8_t enable)
+{
+    uint16_t val = 0;
+
+    if (enable) {
+
+        analog_read(ANA_REG_71, &val);
+        val |= REG071_DBL_FREQ_SEL;
+        analog_write(ANA_REG_71, val);
+
+        analog_read(ANA_REG_70, &val);
+        val |= REG070_DIG_DBL_EN;
+        analog_write(ANA_REG_70, val);
+
+        hal_sys_timer_delay(US_TO_TICKS(100));
+
+        val &= ~REG070_DIG_DBL_RST;
+        analog_write(ANA_REG_70, val);
+        
+    } else {
+
+        analog_read(ANA_REG_70, &val);
+        val &= ~REG070_DIG_DBL_EN;
+        analog_write(ANA_REG_70, val);
+
+    }
+}
+#endif
+
+//--------------------------------------------------------------
+// DCXO
+//--------------------------------------------------------------
+
+int analog_dcxo_enabled(void)
+{
+    uint16_t val;
+
+    analog_read(ANA_REG_174, &val);
+    return !!(val & REG174_DIG_XTAL_DCXO_EN);
+}
+
+int analog_dcxo_fine_tune_stable(void)
+{
+    uint16_t val;
+
+    analog_read(ANA_REG_174, &val);
+    return !!(val & REG174_DBG_FINE_TUN_STABLE);
+}
+
+void analog_dcxo_enable_hs_mode(void)
+{
+    analog_write(ANA_REG_16C, 0x80FF);
+    analog_write(ANA_REG_168, 0xA600);
+    analog_write(ANA_REG_169, 0x0064);
+
+#if 0	
+    analog_write(ANA_REG_16A, 0x49EF);
+    analog_write(ANA_REG_16B, 0x0002);
+#else
+	analog_write(ANA_REG_16A, 0x1b2F);
+	analog_write(ANA_REG_16B, 0x000F);
+	analog_write(ANA_REG_164, 0x20dc);
+#endif
+    analog_write(ANA_REG_16C, 0x00FF);
+}
+
+#ifdef CHIP_HAS_DCO
+
+#include "hwtimer_list.h"
+
+#ifndef DCO_VD1P8_ISEL_TUNING
+//#define DCO_VD1P8_ISEL_TUNING	0xf
+#define DCO_VD1P8_ISEL_TUNING	0x7
+#endif
+#ifndef DCO_VD1P8_ISEL_IDLE
+#define DCO_VD1P8_ISEL_IDLE		0x07
+#endif
+
+#define DCO_CALIB_AUTO_MODE
+
+void analog_check_dco_freq (void)
+{
+	//return;
+
+#ifndef DCO_CALIB_AUTO_MODE
+	uint16_t val_171;		// current count
+	uint16_t val_166;
+	uint16_t val_165;
+	uint16_t val_16a;		// goal count
+
+	uint16_t val_172;
+	uint16_t val_16b;
+
+	int16_t diff_ppm;
+	uint16_t target_tune_code;
+
+	analog_read(ANA_REG_171, &val_171);
+	analog_read(ANA_REG_166, &val_166);
+	analog_read(ANA_REG_165, &val_165);
+	analog_read(ANA_REG_16A, &val_16a);
+
+	analog_read(ANA_REG_172, &val_172);
+	analog_read(ANA_REG_16B, &val_16b);
+
+	diff_ppm = val_171 - val_16a;
+	target_tune_code = (val_166 & 0xfff) >> 1;
+
+	TRACE("check_dco:");
+	TRACE("-> 171[%x], 172[%x]", val_171, val_172);
+	TRACE("-> 16a[%x], 16b[%x]", val_16a, val_16b);
+	TRACE("-> 166[%x], 165[%x]", val_166, val_165);
+
+	TRACE("->00: tune_code[%x], diff_ppm[%d]", target_tune_code, diff_ppm);
+	/*
+		if diff_ppm < 0, meaning the freq is slower than 24M, and the fine tune code should getting smaller
+		if diff_ppm > 0, meaning the freq is faster than 24M, and the fine tune code should getting larger
+	*/
+
+	if (val_165 & (1<<14)) {
+		// if sdm is bypassed, the minimun tuning step is 100ppm, and the least 3 bits should be ignored
+		target_tune_code >>= 3;
+		diff_ppm /= 100;
+		TRACE("->01: tune_code[%x], diff_ppm[%d]", target_tune_code, diff_ppm);
+		target_tune_code += diff_ppm;
+		val_166 = (val_166&0xf00f) | ((target_tune_code&0xff)<<4);
+		TRACE("->02: tune_code[%x], val_166[%x]", target_tune_code, val_166);
+		
+	} else {
+		// if sdm is working, the minimum tuning step is 10ppm
+		//diff_ppm /= 10;
+		diff_ppm = (diff_ppm*10 + 82) / 164;
+		target_tune_code += diff_ppm;// + 5;
+		val_166 = (val_166&0xf001) | ((target_tune_code&0x7ff)<<1);
+		TRACE("->11: tune_code[%x], val_166[%x], diff_ppm[%d]", target_tune_code, val_166, diff_ppm);
+	}
+	
+	analog_write(ANA_REG_166, val_166);
+#endif
+}
+
+#ifndef PROGRAMMER
+enum {
+	DCO_FINE_TUNE_STATE_STOPPED,
+	DCO_FINE_TUNE_STATE_TUNING,
+	DCO_FINE_TUNE_STATE_WAITING,
+
+	DCO_FINE_TUNE_STATE_NUM
+};
+
+#define DCO_FINE_TUNING_INTERVAL		MS_TO_TICKS(5*1000)
+#define DCO_FINE_WAITING_INTERVAL		MS_TO_TICKS(1*60*1000)
+
+//#define DCO_CALIB_AUTO_MODE
+
+static uint8_t s_ana_dco_fine_tune_state;
+static uint8_t s_ana_dco_codec_state;
+static HWTIMER_ID s_ana_dco_fine_tune_timer;
+
+static void ana_dco_fine_tune_timer_hdl (void* param)
+{
+	uint16_t val = 0;
+//	static uint8_t s_dco_fine_tune_first_tried;
+
+	TRACE("%s: state[%d]", __func__, s_ana_dco_fine_tune_state);
+
+	if (s_ana_dco_fine_tune_state == DCO_FINE_TUNE_STATE_WAITING) {
+
+		analog_read(ANA_REG_162, &val);
+		val &= ~REG162_DCO_VD1P8_ISEL_MASK;
+		val |= REG162_DCO_VD1P8_ISEL(DCO_VD1P8_ISEL_TUNING);
+		analog_write(ANA_REG_162, val);
+
+		analog_read(ANA_REG_7C, &val);
+		val |= REG07C_FINE_EN;
+		analog_write(ANA_REG_7C, val);
+
+		hwtimer_start(s_ana_dco_fine_tune_timer, DCO_FINE_TUNING_INTERVAL);
+		s_ana_dco_fine_tune_state = DCO_FINE_TUNE_STATE_TUNING;
+
+		return;
+	}
+
+	if (s_ana_dco_fine_tune_state == DCO_FINE_TUNE_STATE_TUNING) {
+
+		if (1) { //(s_dco_fine_tune_first_tried) {
+#ifndef DCO_CALIB_AUTO_MODE
+			analog_check_dco_freq();
+#endif
+		}
+
+		analog_read(ANA_REG_7C, &val);
+		val &= ~REG07C_FINE_EN;
+		analog_write(ANA_REG_7C, val);
+
+		analog_read(ANA_REG_162, &val);
+		val &= ~REG162_DCO_VD1P8_ISEL_MASK;
+		val |= REG162_DCO_VD1P8_ISEL(DCO_VD1P8_ISEL_IDLE);
+		analog_write(ANA_REG_162, val);
+
+		if (1) {//(s_dco_fine_tune_first_tried) {
+			hwtimer_start(s_ana_dco_fine_tune_timer, DCO_FINE_WAITING_INTERVAL);
+		} else {
+			hwtimer_start(s_ana_dco_fine_tune_timer, MS_TO_TICKS(1000));
+			//s_dco_fine_tune_first_tried = 1;
+		}
+
+		s_ana_dco_fine_tune_state = DCO_FINE_TUNE_STATE_WAITING;		
+
+		analog_read(ANA_REG_174, &val);
+		val &= 0x7ff;
+		TRACE("-> FINE_CODE: %d", val);
+
+#ifdef FACT_DCO_TUNE
+		//fact_sect_set_dco_fine_tune_code(target_tune_code, DCO_FINE_TUNE_CODE_SET_USB_FS_BIN);
+		//fact_sect_set_dco_fine_tune_code(target_tune_code, 0);
+		analog_read(ANA_REG_174, &val);
+		val &= 0x7ff;
+		fact_sect_set_dco_fine_tune_code(val, 0);
+#endif
+		
+		return;
+	}
+}
+#endif
+
+void analog_dco_fine_tune_stop (void)
+{
+
+#ifndef PROGRAMMER
+	if (s_ana_dco_fine_tune_state != DCO_FINE_TUNE_STATE_STOPPED) {
+		uint32_t locks;
+
+		locks = int_lock();
+		hwtimer_stop(s_ana_dco_fine_tune_timer);
+		int_unlock(locks);
+	}
+	s_ana_dco_fine_tune_state = DCO_FINE_TUNE_STATE_STOPPED;
+#else
+	analog_check_dco_freq();
+#endif
+
+	uint16_t val;
+
+	analog_read(ANA_REG_7C, &val);
+	val &= ~REG07C_FINE_EN;
+	analog_write(ANA_REG_7C, val);
+
+	analog_read(ANA_REG_162, &val);
+	val &= ~REG162_DCO_VD1P8_ISEL_MASK;
+	val |= REG162_DCO_VD1P8_ISEL(DCO_VD1P8_ISEL_IDLE);
+	analog_write(ANA_REG_162, val);
+
+}
+
+void analog_dco_fine_tune_start (void)
+{
+	static uint8_t s_fine_tune_first_started;
+	
+#ifndef PROGRAMMER
+	if (!s_ana_dco_fine_tune_timer) {
+		s_ana_dco_fine_tune_timer = hwtimer_alloc(ana_dco_fine_tune_timer_hdl, NULL);
+	}
+
+	if (!s_ana_dco_fine_tune_timer) {
+		return;
+	}
+
+	if (s_ana_dco_fine_tune_state != DCO_FINE_TUNE_STATE_STOPPED) {
+		hwtimer_stop(s_ana_dco_fine_tune_timer);
+		s_ana_dco_fine_tune_state = DCO_FINE_TUNE_STATE_STOPPED;
+	}
+#endif
+	uint16_t val = 0;
+
+	
+	// to set the DCO ISEL
+	analog_read(ANA_REG_162, &val);
+	val &= ~REG162_DCO_VD1P8_ISEL_MASK;
+	val |= REG162_DCO_VD1P8_ISEL(DCO_VD1P8_ISEL_TUNING);
+	analog_write(ANA_REG_162, val);
+
+	if (!is_3001s_chip_d()) {
+		
+		if (!s_fine_tune_first_started) {
+
+			// to disable both fine tuning and coarse tuning
+			analog_read(ANA_REG_7C, &val);
+			val |= REG07C_COARSE_EN_DR | REG07C_FINE_EN_DR | REG07C_DCO_PU_DIVN_DR;
+			val &= ~(REG07C_FINE_EN | REG07C_COARSE_EN);
+			analog_write(ANA_REG_7C, val);
+
+			// to enable the manually-mode fine tuning
+			analog_read(ANA_REG_166, &val);
+#ifndef DCO_CALIB_AUTO_MODE
+			val |= REG166_DCO_FINE_TUN_CODE_DR;
+#else
+			val &= ~REG166_DCO_FINE_TUN_CODE_DR;
+#endif
+			analog_write(ANA_REG_166, val);
+
+			// to enable bothe filter bypass and sdm bypass
+			analog_read(ANA_REG_165, &val);
+			//val |= (REG165_FILTER_BYPASS | REG165_SDM_BYPASS); 	// filter bypass
+#ifdef DCO_CALIB_AUTO_MODE
+			val &= ~REG165_FILTER_BYPASS; 	// filter bypass
+#else
+			val |= REG165_FILTER_BYPASS; 	// filter bypass
+#endif
+			//val &= ~(REG165_FILTER_BYPASS|REG165_SDM_BYPASS);
+			if (!is_3001s_chip_d()) {
+				val |= REG165_SDM_BYPASS;	// SDM bypass
+			} else {
+				val &= ~REG165_SDM_BYPASS;	// SDM bypass
+			}
+			analog_write(ANA_REG_165, val);
+
+			// to enable the divn
+			analog_read(ANA_REG_7B, &val);
+			val |= REG07B_DCO_PU_DIVN;
+			analog_write(ANA_REG_7B, val);
+
+			s_fine_tune_first_started = 1;
+		}
+
+#ifndef PROGRAMMER
+		hwtimer_start(s_ana_dco_fine_tune_timer, DCO_FINE_TUNING_INTERVAL*2);
+		s_ana_dco_fine_tune_state = DCO_FINE_TUNE_STATE_TUNING;
+#endif		
+	}	
+	else {
+		// to enable bothe filter bypass and sdm bypass
+		analog_read(ANA_REG_165, &val);
+		val &= ~REG165_FILTER_BYPASS;	// filter bypass
+		val &= ~REG165_SDM_BYPASS;	// SDM bypass
+		analog_write(ANA_REG_165, val);
+		
+		// to enable the manually-mode fine tuning
+		analog_read(ANA_REG_166, &val);
+		val &= ~REG166_DCO_FINE_TUN_CODE_DR;
+		analog_write(ANA_REG_166, val);
+	}
+
+	// to start fine tuning
+	analog_read(ANA_REG_7C, &val);
+	val |= REG07C_FINE_EN;
+	analog_write(ANA_REG_7C, val);
+}
+
+#if 0
+void analog_dco_set_codec_state (uint8_t stream, uint8_t on)
+{
+	// stream: 0-playback, 1-capture
+	uint8_t offset[2] = {0, 2};
+	uint8_t mask = 0x3;
+	uint8_t new_state = s_ana_dco_codec_state;
+	
+	if (stream >= 2) {
+		return;
+	}
+
+	new_state &= ~(mask<<offset[stream]);
+	if (on) {
+		new_state |= (1<<offset[stream]);
+	}
+
+ 	if (!s_ana_dco_codec_state && new_state) {
+		if (s_ana_dco_fine_tune_state == DCO_FINE_TUNE_STATE_STOPPED) {
+			
+		}
+	}
+}
+#endif
+#endif
+
