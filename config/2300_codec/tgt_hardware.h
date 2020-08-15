@@ -92,7 +92,7 @@ extern const char *BLE_DEFAULT_NAME;
 extern uint8_t ble_addr[6];
 extern uint8_t bt_addr[6];
 
-#define CODEC_SADC_VOL (8)
+#define CODEC_SADC_VOL (12)
 
 extern const struct CODEC_DAC_VOL_T codec_dac_vol[TGT_VOLUME_LEVEL_QTY];
 
