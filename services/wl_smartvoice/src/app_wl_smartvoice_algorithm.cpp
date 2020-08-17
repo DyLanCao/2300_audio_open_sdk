@@ -8,6 +8,10 @@
 #include "app_overlay.h"
 #endif
 
+#ifdef GCC_PLAT
+#include "gcc_plat.h"
+#endif
+
 #define APP_WL_SMARTVOICE_SAMPLE_COUNT_OF_10MS              (160)
 static bool b_nsx_denoise = true;
 static uint8_t nsx_level = 2;
@@ -25,6 +29,7 @@ void app_wl_smartvoice_algorithm_denoise_level_set(uint8_t level)
 {
     nsx_level = level;
 }
+
 void app_wl_smartvoice_algorithm_init(uint8_t* nsx_heap)
 {
 #ifdef WL_NSX

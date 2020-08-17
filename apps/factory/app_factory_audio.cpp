@@ -43,6 +43,10 @@
 #include "audio_dump.h"
 #endif
 
+#ifdef GCC_PLAT
+#include "gcc_plat.h"
+#endif
+
 #ifdef __FACTORY_MODE_SUPPORT__
 
 #define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(320*2)
@@ -172,7 +176,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     }
 
 
-    aaudio_div_stero_to_rmono(one_buff,(int16_t*)buf,pcm_len);
+    aaudio_div_stero_to_lmono(one_buff,(int16_t*)buf,pcm_len);
+    aaudio_div_stero_to_rmono(two_buff,(int16_t*)buf,pcm_len);
+
+#ifdef GCC_PLAT
+    gcc_plat_process(one_buff,two_buff,pcm_len>>1);
+#endif
+
     //DUMP16("%5d, ",temp_buff,20);
 #ifdef AUDIO_DEBUG
     audio_dump_clear_up();
@@ -286,6 +296,12 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         if (freq < APP_SYSFREQ_52M) {
             freq = APP_SYSFREQ_52M;
         }
+
+
+#ifdef GCC_PLAT
+        gcc_plat_init();
+#endif
+
         app_sysfreq_req(APP_SYSFREQ_USER_APP_0, freq);
 
         a2dp_cache_status = APP_AUDIO_CACHE_QTY;

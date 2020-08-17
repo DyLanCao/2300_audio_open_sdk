@@ -10,6 +10,7 @@ ccflags-y += $(AAC_INCLUDES) \
 	-Iservices/audio_dump/include \
 	-Iservices/hw_dsp/inc \
 	-Iservices/fs/fat \
+	-Iservices/multimedia/wl_alg/gcc_plat/include \
 	-Iservices/fs/sd \
 	-Iservices/fs/fat/ChaN \
 	$(BT_IF_INCLUDES) \

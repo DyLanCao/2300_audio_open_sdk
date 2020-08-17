@@ -13,6 +13,7 @@ ccflags-y +=  \
     -Iservices/nvrecord \
     -Iservices/bt_if/inc \
     -Iservices/resources \
+    -Iservices/multimedia/wl_alg/gcc_plat/include \
     -Iservices/overlay \
     -Iservices/multimedia/wl_alg/nsx_main/include \
     -Iservices/multimedia/algorithm/fft/include \

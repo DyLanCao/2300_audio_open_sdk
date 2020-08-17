@@ -223,6 +223,9 @@ export WL_NSX ?= 1
 
 export AUDIO_DEBUG ?= 0
 
+
+export GCC_PLAT ?= 1
+
 SUPPORT_BATTERY_REPORT ?= 1
 
 SUPPORT_HF_INDICATORS ?= 0
