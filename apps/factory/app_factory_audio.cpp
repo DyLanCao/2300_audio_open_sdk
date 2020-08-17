@@ -180,7 +180,12 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     aaudio_div_stero_to_rmono(two_buff,(int16_t*)buf,pcm_len);
 
 #ifdef GCC_PLAT
-    gcc_plat_process(one_buff,two_buff,pcm_len>>1);
+    uint32_t gcc_gain = gcc_plat_process(one_buff,two_buff,pcm_len>>1);
+
+    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+    {
+        one_buff[icnt] = one_buff[icnt]>>gcc_gain;
+    }
 #endif
 
     //DUMP16("%5d, ",temp_buff,20);
