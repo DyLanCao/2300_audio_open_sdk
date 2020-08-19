@@ -45,6 +45,8 @@
 
 #ifdef GCC_PLAT
 #include "gcc_plat.h"
+
+#define GCC_PLAT_START_THD 200
 #endif
 
 #ifdef __FACTORY_MODE_SUPPORT__
@@ -180,12 +182,36 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     aaudio_div_stero_to_rmono(two_buff,(int16_t*)buf,pcm_len);
 
 #ifdef GCC_PLAT
-    uint32_t gcc_gain = gcc_plat_process(one_buff,two_buff,pcm_len>>1);
 
-    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+    static uint32_t gcc_plat_count = 0;
+
+    if(gcc_plat_count > GCC_PLAT_START_THD)
     {
-        one_buff[icnt] = one_buff[icnt]>>gcc_gain;
+        uint32_t gcc_gain = gcc_plat_process(one_buff,two_buff,pcm_len>>1);
+
+        for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+        {
+            one_buff[icnt] = one_buff[icnt]>>gcc_gain;
+        }
     }
+    else
+    {
+        /* code */
+        gcc_plat_count++;
+        // for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+        // {
+        //     one_buff[icnt] = 0;
+        // }
+    }
+    
+#endif
+
+    //nsx denosie alg
+#ifdef WL_NSX
+
+    wl_nsx_16k_denoise(one_buff,two_buff);
+    memcpy(one_buff,two_buff,pcm_len);
+
 #endif
 
     //DUMP16("%5d, ",temp_buff,20);
@@ -198,7 +224,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 2 right agc 10 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+        TRACE("mic 1 right agc 12 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
 
@@ -327,6 +353,14 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_audio_mempool_get_buff(&buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
         app_audio_pcmbuff_init(buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
         memset(&stream_cfg, 0, sizeof(stream_cfg));
+
+#ifdef WL_NSX
+        app_overlay_select(APP_OVERLAY_FM);
+        uint8_t* nsx_heap;
+        app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
+        wl_nsx_denoise_init(16000,2, nsx_heap);
+#endif
+
         stream_cfg.bits = AUD_BITS_16;
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2  
         stream_cfg.channel_num = AUD_CHANNEL_NUM_2;

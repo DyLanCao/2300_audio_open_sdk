@@ -1400,17 +1400,6 @@ int app_init(void)
     app_audio_manager_open();
     app_overlay_open();
 
-#ifdef AUDIO_LOOPBACK
-
-#ifdef APP_LINEIN_SOURCE
-    extern int app_source_linein_loopback_test(bool on);
-    app_source_linein_loopback_test(true);
-#else
-   app_factorymode_audioloop(true, APP_SYSFREQ_208M);
-#endif
-
-    while(1);
-#endif
 
     nv_record_env_init();
     nvrec_dev_data_open();
@@ -1468,6 +1457,18 @@ int app_init(void)
 
 #if defined(GSOUND_OTA_ENABLED)
     GSoundOtaHandlerInit();
+#endif
+
+#ifdef AUDIO_LOOPBACK
+
+#ifdef APP_LINEIN_SOURCE
+    extern int app_source_linein_loopback_test(bool on);
+    app_source_linein_loopback_test(true);
+#else
+   app_factorymode_audioloop(true, APP_SYSFREQ_104M);
+#endif
+
+    while(1);
 #endif
 
     btdrv_start_bt();
