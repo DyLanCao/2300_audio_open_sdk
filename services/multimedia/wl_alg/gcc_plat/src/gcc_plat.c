@@ -20,7 +20,7 @@ static uint32_t gcc_gain = GCC_GAIN_VALUE;
 void gcc_plat_init(void)
 {
     TRACE("gcc_plat_init success");
-    gcc_gain = gcc_gain>>2;
+    gcc_gain = gcc_gain>>1;
 }
 
 

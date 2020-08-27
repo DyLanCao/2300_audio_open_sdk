@@ -49,12 +49,18 @@
 #define GCC_PLAT_START_THD 200
 #endif
 
+#ifdef AUDIO_DEBUG
+#include "audio_dump.h"
+#endif
+
 #ifdef __FACTORY_MODE_SUPPORT__
 
 #define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(320*2)
 static enum APP_AUDIO_CACHE_T a2dp_cache_status = APP_AUDIO_CACHE_QTY;
 static int16_t *app_audioloop_play_cache = NULL;
 
+
+short out_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
@@ -224,7 +230,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 1 right agc 12 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+        TRACE("mic 1 right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
 
@@ -279,7 +285,15 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     short *pcm_buff = (short*)buf;
 
 
-    DUMP16("%5d, ",pcm_buff,30);
+#ifdef WL_NSX
+
+    wl_nsx_16k_denoise(pcm_buff,out_buff);
+    memset(pcm_buff,0x0,len);
+    memcpy(pcm_buff,out_buff,len);
+
+#endif
+
+    //DUMP16("%5d, ",pcm_buff,30);
 
 #ifdef AUDIO_DEBUG
     uint32_t pcm_len = len>>1;
@@ -292,7 +306,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     audio_dump_run();
 #endif
 
-    app_audio_pcmbuff_put(buf, len);
+    app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
 
 #endif
 
