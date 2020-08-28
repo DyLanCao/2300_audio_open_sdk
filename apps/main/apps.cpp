@@ -1465,7 +1465,7 @@ int app_init(void)
     extern int app_source_linein_loopback_test(bool on);
     app_source_linein_loopback_test(true);
 #else
-   app_factorymode_audioloop(true, APP_SYSFREQ_104M);
+   app_factorymode_audioloop(true, APP_SYSFREQ_208M);
 #endif
 
     while(1);

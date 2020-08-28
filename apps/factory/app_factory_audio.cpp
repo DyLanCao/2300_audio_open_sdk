@@ -30,6 +30,10 @@
 #include "app_factory_audio.h"
 #include "tgt_hardware.h"
 
+#ifdef NOTCH_FILTER
+#include "autowah.h"
+#endif
+
 #ifdef WL_NSX
 #include "nsx_main.h"
 #include "app_overlay.h"
@@ -284,19 +288,49 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     short *pcm_buff = (short*)buf;
 
+    //DUMP16("%5d, ",pcm_buff,30);
 
-#ifdef WL_NSX
+    int32_t stime = 0;
+    static int32_t nsx_cnt = 0;
+    uint32_t pcm_len = len>>1;
 
-    wl_nsx_16k_denoise(pcm_buff,out_buff);
-    memset(pcm_buff,0x0,len);
-    memcpy(pcm_buff,out_buff,len);
+    nsx_cnt++;
+    //DUMP16("%d,",(short*)buf,30);
+    if(false == (nsx_cnt & 0x3F))
+    {
+        stime = hal_sys_timer_get();
+	    //TRACE("aecm  echo time: lens:%d  g_time_cnt:%d ",len, g_time_cnt);
+    }
 
-#endif
+
+#ifdef NOTCH_FILTER
 
     //DUMP16("%5d, ",pcm_buff,30);
 
+    for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
+    {
+        //pcm_buff[icnt] = -100;
+        double yout = AutoWah_process(pcm_buff[icnt]);
+        AutoWah_sweep();
+        //TRACE("oyout:%d yout:%d  ",(short)yout,yout);
+
+        pcm_buff[icnt] = (short)yout;
+    }
+
+
+#endif
+
+
+// #ifdef WL_NSX
+
+//     wl_nsx_16k_denoise(pcm_buff,out_buff);
+//     memset(pcm_buff,0x0,len);
+//     memcpy(pcm_buff,out_buff,len);
+
+// #endif
+
+
 #ifdef AUDIO_DEBUG
-    uint32_t pcm_len = len>>1;
     
     audio_dump_clear_up();
     audio_dump_add_channel_data(0, pcm_buff, pcm_len);
@@ -307,6 +341,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 #endif
 
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
+
+
+    if(false == (nsx_cnt & 0x3F))
+    {
+        TRACE("channel 1 agc 14 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+    }
+    
 
 #endif
 
@@ -347,6 +388,10 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         gcc_plat_init();
 #endif
 
+#ifdef NOTCH_FILTER
+        AutoWah_init(20000,16000,420,380,1,0.662,10);
+#endif
+
         app_sysfreq_req(APP_SYSFREQ_USER_APP_0, freq);
 
         a2dp_cache_status = APP_AUDIO_CACHE_QTY;
@@ -356,7 +401,7 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 #elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 3
         app_audio_mempool_get_buff(&buff_capture, 3*BT_AUDIO_FACTORMODE_BUFF_SIZE);
 #elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 4
-        app_audio_mempool_get_buff(&buff_capture, 3*BT_AUDIO_FACTORMODE_BUFF_SIZE);
+        app_audio_mempool_get_buff(&buff_capture, 4*BT_AUDIO_FACTORMODE_BUFF_SIZE);
 #else
         app_audio_mempool_get_buff(&buff_capture, BT_AUDIO_FACTORMODE_BUFF_SIZE);
 
@@ -373,6 +418,9 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
         wl_nsx_denoise_init(16000,2, nsx_heap);
+#endif
+
+#ifdef NOTCH_FILTER
 #endif
 
         stream_cfg.bits = AUD_BITS_16;
