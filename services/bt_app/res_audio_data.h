@@ -17,11 +17,11 @@
 #ifdef MEDIA_PLAYER_SUPPORT
 
 const uint8_t EN_POWER_ON [] = {
-#include "res/en/SOUND_POWER_ON.txt"
+//#include "res/en/SOUND_POWER_ON.txt"
 };
 
 const uint8_t EN_POWER_OFF [] = {
-#include "res/en/SOUND_POWER_OFF.txt"
+//#include "res/en/SOUND_POWER_OFF.txt"
 };
 
 const uint8_t EN_SOUND_ZERO[] = {
@@ -29,39 +29,39 @@ const uint8_t EN_SOUND_ZERO[] = {
 };
 
 const uint8_t EN_SOUND_ONE[] = {
-#include "res/en/SOUND_ONE.txt"
+//#include "res/en/SOUND_ONE.txt"
 };
 
 const uint8_t EN_SOUND_TWO[] = {
-#include "res/en/SOUND_TWO.txt"
+//#include "res/en/SOUND_TWO.txt"
 };
 
 const uint8_t EN_SOUND_THREE[] = {
-#include "res/en/SOUND_THREE.txt"
+//#include "res/en/SOUND_THREE.txt"
 };
 
 const uint8_t EN_SOUND_FOUR[] = {
-#include "res/en/SOUND_FOUR.txt"
+//#include "res/en/SOUND_FOUR.txt"
 };
 
 const uint8_t EN_SOUND_FIVE[] = {
-#include "res/en/SOUND_FIVE.txt"
+//#include "res/en/SOUND_FIVE.txt"
 };
 
 const uint8_t EN_SOUND_SIX[] = {
-#include "res/en/SOUND_SIX.txt"
+//#include "res/en/SOUND_SIX.txt"
 };
 
 const uint8_t EN_SOUND_SEVEN [] = {
-#include "res/en/SOUND_SEVEN.txt"
+//#include "res/en/SOUND_SEVEN.txt"
 };
 
 const uint8_t EN_SOUND_EIGHT [] = {
-#include "res/en/SOUND_EIGHT.txt"
+//#include "res/en/SOUND_EIGHT.txt"
 };
 
 const uint8_t EN_SOUND_NINE [] = {
-#include "res/en/SOUND_NINE.txt"
+//#include "res/en/SOUND_NINE.txt"
 };
 
 const uint8_t EN_BT_PAIR_ENABLE[] = {
@@ -73,7 +73,7 @@ const uint8_t EN_BT_PAIRING[] = {
 };
 
 const uint8_t EN_BT_PAIRING_FAIL[] = {
-#include "res/en/SOUND_PAIRING_FAIL.txt"
+//#include "res/en/SOUND_PAIRING_FAIL.txt"
 };
 
 const uint8_t EN_BT_PAIRING_SUCCESS[] = {
@@ -81,7 +81,7 @@ const uint8_t EN_BT_PAIRING_SUCCESS[] = {
 };
 
 const uint8_t EN_BT_REFUSE[] = {
-#include "res/en/SOUND_REFUSE.txt"
+//#include "res/en/SOUND_REFUSE.txt"
 };
 
 const uint8_t EN_BT_OVER[] = {

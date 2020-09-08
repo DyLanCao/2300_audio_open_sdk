@@ -26,9 +26,9 @@ FLASH_CHIP	?= ALL
 # GD25Q32C
 # ALL
 
-AUDIO_OUTPUT_MONO ?= 0
+AUDIO_OUTPUT_MONO ?= 1
 
-AUDIO_OUTPUT_DIFF ?= 1
+AUDIO_OUTPUT_DIFF ?= 0
 
 HW_FIR_EQ_PROCESS ?= 0
 
@@ -222,6 +222,9 @@ export WL_NSX ?= 1
 
 
 export WL_AGC ?= 1
+
+
+export WL_HIGH_SAMPLE ?= 1
 
 export WL_VAD ?= 0
 
