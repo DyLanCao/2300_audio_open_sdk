@@ -5,11 +5,14 @@
 #include "analog_agc.h"
 
 
-pAgc_t   pAgc = NULL;
+pAgc_t  pAgc = NULL;
+
+//void *test = NULL;
+
 void WebRtcAgc_init(void)
 {
     int ret = 0;
-    WebRtcAgc_Create(&pAgc);
+    WebRtcAgc_Create((void*)&pAgc);
     int minLevel = 0;
     int maxLevel = 255;
     int agcMode  = kAgcModeAdaptiveDigital;
@@ -25,7 +28,7 @@ void WebRtcAgc_init(void)
     agcConfig.limiterEnable     = 1;
     agcConfig.targetLevelDbfs   = 3;
 #endif
-    ret = WebRtcAgc_set_config(pAgc, agcConfig);
+    ret = wl_WebRtcAgc_set_config(pAgc, agcConfig);
     ASSERT(0 == ret, "failed in WebRtcAgc_init nAgcRet:%d ",ret);
 
     TRACE("webrtc agc init success");
@@ -40,7 +43,7 @@ void WebRtcAgc_Alg_Process(short *pData, short *pOutData)
 {
 
     int inMicLevel  = g_micLevelIn;
-    int outMicLevel = 0;
+    int32_t outMicLevel = 0;
     uint8_t saturationWarning;
     int nAgcRet = WebRtcAgc_Process(pAgc, pData, NULL, FRAME_VALUE, pOutData,NULL, inMicLevel, &outMicLevel, 0, &saturationWarning);
     ASSERT(0 == nAgcRet, "failed in WebRtcAgc_Process nAgcRet:%d ",nAgcRet);

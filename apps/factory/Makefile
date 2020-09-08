@@ -15,8 +15,10 @@ ccflags-y +=  \
     -Iservices/resources \
     -Iservices/audio_dump/include \
     -Iservices/multimedia/wl_alg/gcc_plat/include \
+    -Iservices/multimedia/wl_alg/vad_user/include \
     -Iservices/overlay \
     -Iservices/multimedia/wl_alg/nsx_main/include \
+    -Iservices/multimedia/wl_alg/agc/include \
     -Iservices/multimedia/wl_alg/notch_filter/include \
     -Iservices/multimedia/algorithm/fft/include \
     -Iapps/key \

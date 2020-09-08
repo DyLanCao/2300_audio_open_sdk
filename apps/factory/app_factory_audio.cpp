@@ -39,6 +39,11 @@
 #include "app_overlay.h"
 #endif
 
+
+#ifdef WEBRTC_AGC
+#include "agc_main.h"
+#endif
+
 #ifdef WL_NSX
 #define WEBRTC_NSX_BUFF_SIZE    	(14000)
 #endif
@@ -55,6 +60,10 @@
 
 #ifdef AUDIO_DEBUG
 #include "audio_dump.h"
+#endif
+
+#ifdef WL_VAD
+#include "vad_user.h"
 #endif
 
 #ifdef __FACTORY_MODE_SUPPORT__
@@ -292,9 +301,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     int32_t stime = 0;
     static int32_t nsx_cnt = 0;
+    static int32_t dump_cnt = 0;
+
     uint32_t pcm_len = len>>1;
 
     nsx_cnt++;
+    dump_cnt++;
+
     //DUMP16("%d,",(short*)buf,30);
     if(false == (nsx_cnt & 0x3F))
     {
@@ -302,9 +315,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 	    //TRACE("aecm  echo time: lens:%d  g_time_cnt:%d ",len, g_time_cnt);
     }
 
+#ifdef WL_VAD
+    //memset(pcm_buff,0x0,pcm_len*2);
+    wl_vad_process_frame(pcm_buff,pcm_len);
+#endif
+
 
 #ifdef NOTCH_FILTER
-
     //DUMP16("%5d, ",pcm_buff,30);
 
     for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
@@ -321,23 +338,46 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 #endif
 
 
-// #ifdef WL_NSX
+#ifdef WL_NSX
 
-//     wl_nsx_16k_denoise(pcm_buff,out_buff);
-//     memset(pcm_buff,0x0,len);
-//     memcpy(pcm_buff,out_buff,len);
+    wl_nsx_16k_denoise(pcm_buff,out_buff);
+    memset(pcm_buff,0x0,len);
+    memcpy(pcm_buff,out_buff,len);
 
-// #endif
+#endif
 
 
 #ifdef AUDIO_DEBUG
     
+    #if 0
+    if(dump_cnt > 0x3FF)
+    {
+        audio_dump_clear_up();
+
+        // for(uint16_t iicnt = 0; iicnt < pcm_len; iicnt++)
+        // {
+        //     pcm_buff[iicnt] = 0;
+        // }
+
+        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
+        //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
+        //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
+
+        audio_dump_run();
+
+        dump_cnt = 0x4FF;
+    }
+
+    #else
     audio_dump_clear_up();
+
     audio_dump_add_channel_data(0, pcm_buff, pcm_len);
     //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
     //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
 
     audio_dump_run();
+    #endif
+
 #endif
 
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
@@ -348,7 +388,6 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
         TRACE("channel 1 agc 14 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
     
-
 #endif
 
     if (a2dp_cache_status == APP_AUDIO_CACHE_QTY){
@@ -417,11 +456,17 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,2, nsx_heap);
+        wl_nsx_denoise_init(16000,1, nsx_heap);
 #endif
 
-#ifdef NOTCH_FILTER
+#ifdef WEBRTC_AGC
+        WebRtcAgc_init();
 #endif
+
+#ifdef WL_VAD
+        wl_vad_init();
+#endif
+
 
         stream_cfg.bits = AUD_BITS_16;
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2  

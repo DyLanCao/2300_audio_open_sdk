@@ -52,24 +52,24 @@ typedef struct
 #endif
 } DigitalAgc_t;
 
-int32_t WebRtcAgc_InitDigital(DigitalAgc_t *digitalAgcInst, int16_t agcMode);
+int32_t wl_WebRtcAgc_InitDigital(DigitalAgc_t *digitalAgcInst, int16_t agcMode);
 
-int32_t WebRtcAgc_ProcessDigital(DigitalAgc_t *digitalAgcInst,
+int32_t wl_WebRtcAgc_ProcessDigital(DigitalAgc_t *digitalAgcInst,
                                  const int16_t *inNear, const int16_t *inNear_H,
                                  int16_t *out, int16_t *out_H, uint32_t FS,
                                  int16_t lowLevelSignal);
 
-int32_t WebRtcAgc_AddFarendToDigital(DigitalAgc_t *digitalAgcInst,
+int32_t wl_WebRtcAgc_AddFarendToDigital(DigitalAgc_t *digitalAgcInst,
                                      const int16_t *inFar,
                                      int16_t nrSamples);
 
-void WebRtcAgc_InitVad(AgcVad_t *vadInst);
+void wl_WebRtcAgc_InitVad(AgcVad_t *vadInst);
 
-int16_t WebRtcAgc_ProcessVad(AgcVad_t *vadInst, // (i) VAD state
+int16_t wl_WebRtcAgc_ProcessVad(AgcVad_t *vadInst, // (i) VAD state
                              const int16_t *in, // (i) Speech signal
                              int16_t nrSamples); // (i) number of samples
 
-int32_t WebRtcAgc_CalculateGainTable(int32_t *gainTable, // Q16
+int32_t wl_WebRtcAgc_CalculateGainTable(int32_t *gainTable, // Q16
                                      int16_t compressionGaindB, // Q0 (in dB)
                                      int16_t targetLevelDbfs,// Q0 (in dB)
                                      uint8_t limiterEnable,

@@ -322,7 +322,7 @@ int WebRtcAgc_AddMic(void *state, int16_t *in_mic, int16_t *in_mic_H,
     /* call VAD (use low band only) */
     for (i = 0; i < samples; i += subFrames)
     {
-        WebRtcAgc_ProcessVad(&stt->vadMic, &in_mic[i], subFrames);
+        wl_WebRtcAgc_ProcessVad(&stt->vadMic, &in_mic[i], subFrames);
     }
 
     return 0;
@@ -388,7 +388,7 @@ int WebRtcAgc_AddFarend(void *state, const int16_t *in_far, int16_t samples)
 
     for (i = 0; i < samples; i += subFrames)
     {
-        errHandle += WebRtcAgc_AddFarendToDigital(&stt->digitalAgc, &in_far[i], subFrames);
+        errHandle += wl_WebRtcAgc_AddFarendToDigital(&stt->digitalAgc, &in_far[i], subFrames);
     }
 
     return errHandle;
@@ -1202,7 +1202,7 @@ int32_t WebRtcAgc_ProcessAnalog(void *state, int32_t inMicLevel,
                 stt->micLvlSat = 1;
                 fprintf(stderr, "target before = %d (%d)\n", stt->analogTargetLevel, stt->targetIdx);
                 WebRtcAgc_UpdateAgcThresholds(stt);
-                WebRtcAgc_CalculateGainTable(&(stt->digitalAgc.gainTable[0]),
+                wl_WebRtcAgc_CalculateGainTable(&(stt->digitalAgc.gainTable[0]),
                         stt->compressionGaindB, stt->targetLevelDbfs, stt->limiterEnable,
                         stt->analogTarget);
                 stt->numBlocksMicLvlSat = 0;
@@ -1343,7 +1343,7 @@ int WebRtcAgc_Process(void *agcInst, const int16_t *in_near,
 
     for (i = 0; i < samples; i += subFrames)
     {
-        if (WebRtcAgc_ProcessDigital(&stt->digitalAgc, &in_near[i], &in_near_H[i], &out[i], &out_H[i],
+        if (wl_WebRtcAgc_ProcessDigital(&stt->digitalAgc, &in_near[i], &in_near_H[i], &out[i], &out_H[i],
                            stt->fs, stt->lowLevelSignal) == -1)
         {
 #ifdef AGC_DEBUG//test log
@@ -1394,7 +1394,7 @@ int WebRtcAgc_Process(void *agcInst, const int16_t *in_near,
     return 0;
 }
 
-int WebRtcAgc_set_config(void *agcInst, WebRtcAgc_config_t agcConfig)
+int wl_WebRtcAgc_set_config(void *agcInst, WebRtcAgc_config_t agcConfig)
 {
     Agc_t *stt;
     stt = (Agc_t *)agcInst;
@@ -1434,7 +1434,7 @@ int WebRtcAgc_set_config(void *agcInst, WebRtcAgc_config_t agcConfig)
     WebRtcAgc_UpdateAgcThresholds(stt);
 
     /* Recalculate gain table */
-    if (WebRtcAgc_CalculateGainTable(&(stt->digitalAgc.gainTable[0]), stt->compressionGaindB,
+    if (wl_WebRtcAgc_CalculateGainTable(&(stt->digitalAgc.gainTable[0]), stt->compressionGaindB,
                            stt->targetLevelDbfs, stt->limiterEnable, stt->analogTarget) == -1)
     {
 #ifdef AGC_DEBUG//test log
@@ -1498,6 +1498,7 @@ int WebRtcAgc_Create(void **agcInst)
    #endif
 
     *agcInst = stt;
+
     if (stt == NULL)
     {
         return -1;
@@ -1544,7 +1545,7 @@ int WebRtcAgc_Init(void *agcInst, int32_t minLevel, int32_t maxLevel,
     /* typecast state pointer */
     stt = (Agc_t *)agcInst;
 
-    if (WebRtcAgc_InitDigital(&stt->digitalAgc, agcMode) != 0)
+    if (wl_WebRtcAgc_InitDigital(&stt->digitalAgc, agcMode) != 0)
     {
         stt->lastError = AGC_UNINITIALIZED_ERROR;
         return -1;
@@ -1573,7 +1574,7 @@ int WebRtcAgc_Init(void *agcInst, int32_t minLevel, int32_t maxLevel,
     stt->fs = fs;
 
     /* initialize input VAD */
-    WebRtcAgc_InitVad(&stt->vadMic);
+    wl_WebRtcAgc_InitVad(&stt->vadMic);
 
     /* If the volume range is smaller than 0-256 then
      * the levels are shifted up to Q8-domain */
@@ -1679,11 +1680,12 @@ int WebRtcAgc_Init(void *agcInst, int32_t minLevel, int32_t maxLevel,
     stt->defaultConfig.targetLevelDbfs = AGC_DEFAULT_TARGET_LEVEL;
     stt->defaultConfig.compressionGaindB = AGC_DEFAULT_COMP_GAIN;
 
-    if (WebRtcAgc_set_config(stt, stt->defaultConfig) == -1)
+    if (wl_WebRtcAgc_set_config(stt, stt->defaultConfig) == -1)
     {
         stt->lastError = AGC_UNSPECIFIED_ERROR;
         return -1;
     }
+
     stt->Rxx160_LPw32 = stt->analogTargetLevel; // Initialize rms value
 
     stt->lowLevelSignal = 0;

@@ -131,4 +131,5 @@ typedef struct
 } Agc_t;
 
 typedef Agc_t *pAgc_t;
+
 #endif // WEBRTC_MODULES_AUDIO_PROCESSING_AGC_MAIN_SOURCE_ANALOG_AGC_H_

@@ -192,7 +192,7 @@ int WebRtcAgc_Process(void* agcInst,
  *                          :  0 - Normal operation.
  *                          : -1 - Error
  */
-int WebRtcAgc_set_config(void* agcInst, WebRtcAgc_config_t config);
+int wl_WebRtcAgc_set_config(void* agcInst, WebRtcAgc_config_t config);
 
 /*
  * This function returns the config parameters (targetLevelDbfs,

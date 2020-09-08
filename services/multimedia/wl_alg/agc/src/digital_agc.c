@@ -59,7 +59,7 @@ static const uint16_t kGenFuncTable[kGenFuncTableSize] = {
 
 static const int16_t kAvgDecayTime = 250; // frames; < 3000
 
-int32_t WebRtcAgc_CalculateGainTable(int32_t *gainTable, // Q16
+int32_t wl_WebRtcAgc_CalculateGainTable(int32_t *gainTable, // Q16
                                      int16_t digCompGaindB, // Q0
                                      int16_t targetLevelDbfs,// Q0
                                      uint8_t limiterEnable,
@@ -259,7 +259,7 @@ int32_t WebRtcAgc_CalculateGainTable(int32_t *gainTable, // Q16
     return 0;
 }
 
-int32_t WebRtcAgc_InitDigital(DigitalAgc_t *stt, int16_t agcMode)
+int32_t wl_WebRtcAgc_InitDigital(DigitalAgc_t *stt, int16_t agcMode)
 {
 
     if (agcMode == kAgcModeFixedDigital)
@@ -280,13 +280,13 @@ int32_t WebRtcAgc_InitDigital(DigitalAgc_t *stt, int16_t agcMode)
 #endif
 
     // initialize VADs
-    WebRtcAgc_InitVad(&stt->vadNearend);
-    WebRtcAgc_InitVad(&stt->vadFarend);
+    wl_WebRtcAgc_InitVad(&stt->vadNearend);
+    wl_WebRtcAgc_InitVad(&stt->vadFarend);
 
     return 0;
 }
 
-int32_t WebRtcAgc_AddFarendToDigital(DigitalAgc_t *stt, const int16_t *in_far,
+int32_t wl_WebRtcAgc_AddFarendToDigital(DigitalAgc_t *stt, const int16_t *in_far,
                                      int16_t nrSamples)
 {
     // Check for valid pointer
@@ -296,12 +296,12 @@ int32_t WebRtcAgc_AddFarendToDigital(DigitalAgc_t *stt, const int16_t *in_far,
     }
 
     // VAD for far end
-    WebRtcAgc_ProcessVad(&stt->vadFarend, in_far, nrSamples);
+    wl_WebRtcAgc_ProcessVad(&stt->vadFarend, in_far, nrSamples);
 
     return 0;
 }
 
-int32_t WebRtcAgc_ProcessDigital(DigitalAgc_t *stt, const int16_t *in_near,
+int32_t wl_WebRtcAgc_ProcessDigital(DigitalAgc_t *stt, const int16_t *in_near,
                                  const int16_t *in_near_H, int16_t *out,
                                  int16_t *out_H, uint32_t FS,
                                  int16_t lowlevelSignal)
@@ -354,7 +354,7 @@ int32_t WebRtcAgc_ProcessDigital(DigitalAgc_t *stt, const int16_t *in_near,
         }
     }
     // VAD for near end
-    logratio = WebRtcAgc_ProcessVad(&stt->vadNearend, out, L * 10);
+    logratio = wl_WebRtcAgc_ProcessVad(&stt->vadNearend, out, L * 10);
 
     // Account for far end VAD
     if (stt->vadFarend.counter > 10)
@@ -634,7 +634,7 @@ int32_t WebRtcAgc_ProcessDigital(DigitalAgc_t *stt, const int16_t *in_near,
     return 0;
 }
 
-void WebRtcAgc_InitVad(AgcVad_t *state)
+void wl_WebRtcAgc_InitVad(AgcVad_t *state)
 {
     int16_t k;
 
@@ -662,7 +662,7 @@ void WebRtcAgc_InitVad(AgcVad_t *state)
     }
 }
 
-int16_t WebRtcAgc_ProcessVad(AgcVad_t *state, // (i) VAD state
+int16_t wl_WebRtcAgc_ProcessVad(AgcVad_t *state, // (i) VAD state
                                    const int16_t *in, // (i) Speech signal
                                    int16_t nrSamples) // (i) number of samples
 {

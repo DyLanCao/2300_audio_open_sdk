@@ -256,8 +256,8 @@ void wl_nsx_16k_denoise(short *i16k_buff, short *o16k_buff)
 {
 
 #ifdef WEBRTC_AGC
-    short array_i16k[160]; //tempSize_22k*sizeof(short)
-    short array_o16k[160]; //tempSize_22k*sizeof(short)
+    //short array_i16k[160]; //tempSize_22k*sizeof(short)
+    //short array_o16k[160]; //tempSize_22k*sizeof(short)
 	//WebRtcAgc_Alg_Process(i16k_buff,o16k_buff);
     //WebRtcSpl_Resample48khzTo16khz(i48k_buff,array_agc_in,(WebRtcSpl_State48khzTo16khz*)state3_48,array_i48k_buff);
     WebRtcAgc_Alg_Process(i16k_buff,o16k_buff);

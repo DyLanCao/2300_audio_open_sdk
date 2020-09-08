@@ -221,12 +221,15 @@ export APP_LINEIN_SOURCE ?= 0
 export WL_NSX ?= 1
 
 
+export WL_AGC ?= 1
+
+export WL_VAD ?= 0
+
 export AUDIO_DEBUG ?= 0
 
+export GCC_PLAT ?= 0
 
-export GCC_PLAT ?= 1
-
-export NOTCH_FILTER ?= 1
+export NOTCH_FILTER ?= 0
 
 SUPPORT_BATTERY_REPORT ?= 1
 
