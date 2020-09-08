@@ -37,6 +37,7 @@ RealInverseFFT wl_WebRtcSpl_RealInverseFFT;
      !defined(MIPS32_LE)
 /* Initialize function pointers to the generic C version. */
 static void InitPointersToC() {
+
   wl_WebRtcSpl_MaxAbsValueW16 = wl_WebRtcSpl_MaxAbsValueW16C;
   wl_WebRtcSpl_MaxAbsValueW32 = wl_WebRtcSpl_MaxAbsValueW32C;
   wl_WebRtcSpl_MaxValueW16 = wl_WebRtcSpl_MaxValueW16C;

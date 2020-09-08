@@ -27,7 +27,7 @@ static const int16_t kLog2Exp = 5909;  // log2(exp(1)) in Q12.
 // x = |input| (Q4)
 // in addition to the probability we output |delta| (in Q11) used when updating
 // the noise/speech model.
-int32_t WebRtcVad_GaussianProbability(int16_t input,
+int32_t wl_WebRtcVad_GaussianProbability(int16_t input,
                                       int16_t mean,
                                       int16_t std,
                                       int16_t* delta) {

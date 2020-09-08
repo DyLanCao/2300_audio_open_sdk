@@ -771,7 +771,7 @@ SECTIONS
 		*:division_operations.o(.text*)
 		*:get_scaling_square.o(.text*)
 		*:spl_init.o(.text*)
-		*:nsx_main.o(.text*)
+		*:wl_nsx_main.o(.text*)
 
 #endif
 

@@ -38,7 +38,7 @@ double silk_energy_FLP(
 )
 {
     opus_int i;
-    double   result;
+    // double   result;
 
     /* 4x unrolled loop */
     result = 0.0;

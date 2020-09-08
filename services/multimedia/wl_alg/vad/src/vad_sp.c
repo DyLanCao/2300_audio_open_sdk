@@ -23,7 +23,7 @@ static const int16_t kSmoothingUp = 32439;  // 0.99 in Q15.
 
 // TODO(bjornv): Move this function to vad_filterbank.c.
 // Downsampling filter based on splitting filter and allpass functions.
-void WebRtcVad_Downsampling(const int16_t* signal_in,
+void wl_WebRtcVad_Downsampling(const int16_t* signal_in,
                             int16_t* signal_out,
                             int32_t* filter_state,
                             size_t in_length) {
@@ -56,7 +56,7 @@ void WebRtcVad_Downsampling(const int16_t* signal_in,
 // Inserts |feature_value| into |low_value_vector|, if it is one of the 16
 // smallest values the last 100 frames. Then calculates and returns the median
 // of the five smallest values.
-int16_t WebRtcVad_FindMinimum(VadInstT* self,
+int16_t wl_WebRtcVad_FindMinimum(VadInstT* self,
                               int16_t feature_value,
                               int channel) {
   int i = 0, j = 0;

@@ -32,7 +32,7 @@ struct RealFFT* WebRtcSpl_CreateRealFFTC(int order) {
     return NULL;
   }
 
-#ifndef STATIC_MEM
+#ifdef STATIC_MEM
   self = (struct RealFFT*)realfft_size;
 #else
   self = malloc(sizeof(struct RealFFT));

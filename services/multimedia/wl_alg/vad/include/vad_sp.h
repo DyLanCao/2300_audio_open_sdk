@@ -30,7 +30,7 @@
 //
 // Output:
 //      - signal_out    : Downsampled signal (of length |in_length| / 2).
-void WebRtcVad_Downsampling(const int16_t* signal_in,
+void wl_WebRtcVad_Downsampling(const int16_t* signal_in,
                             int16_t* signal_out,
                             int32_t* filter_state,
                             size_t in_length);
@@ -49,7 +49,7 @@ void WebRtcVad_Downsampling(const int16_t* signal_in,
 //
 // Returns:
 //                      : Smoothed minimum value for a moving window.
-int16_t WebRtcVad_FindMinimum(VadInstT* handle,
+int16_t wl_WebRtcVad_FindMinimum(VadInstT* handle,
                               int16_t feature_value,
                               int channel);
 

@@ -15,6 +15,7 @@
 #include "vad_gmm.h"
 #include "vad_sp.h"
 #include "typedefs.h"
+#include "hal_trace.h"
 
 // Spectrum Weighting
 static const int16_t kSpectrumWeight[kNumChannels] = { 6, 8, 10, 12, 14, 16 };
@@ -194,7 +195,7 @@ static int16_t GmmProbability(VadInstT* self, int16_t* features,
         gaussian = channel + k * kNumChannels;
         // Probability under H0, that is, probability of frame being noise.
         // Value given in Q27 = Q7 * Q20.
-        tmp1_s32 = WebRtcVad_GaussianProbability(features[channel],
+        tmp1_s32 = wl_WebRtcVad_GaussianProbability(features[channel],
                                                  self->noise_means[gaussian],
                                                  self->noise_stds[gaussian],
                                                  &deltaN[gaussian]);
@@ -203,7 +204,7 @@ static int16_t GmmProbability(VadInstT* self, int16_t* features,
 
         // Probability under H1, that is, probability of frame being speech.
         // Value given in Q27 = Q7 * Q20.
-        tmp1_s32 = WebRtcVad_GaussianProbability(features[channel],
+        tmp1_s32 = wl_WebRtcVad_GaussianProbability(features[channel],
                                                  self->speech_means[gaussian],
                                                  self->speech_stds[gaussian],
                                                  &deltaS[gaussian]);
@@ -279,7 +280,7 @@ static int16_t GmmProbability(VadInstT* self, int16_t* features,
     for (channel = 0; channel < kNumChannels; channel++) {
 
       // Get minimum value in past which is used for long term correction in Q4.
-      feature_minimum = WebRtcVad_FindMinimum(self, features[channel], channel);
+      feature_minimum = wl_WebRtcVad_FindMinimum(self, features[channel], channel);
 
       // Compute the "global" mean, that is the sum of the two means weighted.
       noise_global_mean = WeightedAverage(&self->noise_means[channel], 0,
@@ -488,7 +489,7 @@ static int16_t GmmProbability(VadInstT* self, int16_t* features,
 }
 
 // Initialize the VAD. Set aggressiveness mode to default value.
-int WebRtcVad_InitCore(VadInstT* self) {
+int wl_WebRtcVad_InitCore(VadInstT* self) {
   int i;
 
   if (self == NULL) {
@@ -535,7 +536,7 @@ int WebRtcVad_InitCore(VadInstT* self) {
   }
 
   // Set aggressiveness mode to default (=|kDefaultMode|).
-  if (WebRtcVad_set_mode_core(self, kDefaultMode) != 0) {
+  if (wl_WebRtcVad_set_mode_core(self, kDefaultMode) != 0) {
     return -1;
   }
 
@@ -545,7 +546,7 @@ int WebRtcVad_InitCore(VadInstT* self) {
 }
 
 // Set aggressiveness mode
-int WebRtcVad_set_mode_core(VadInstT* self, int mode) {
+int wl_WebRtcVad_set_mode_core(VadInstT* self, int mode) {
   int return_value = 0;
 
   switch (mode) {
@@ -604,7 +605,7 @@ int WebRtcVad_set_mode_core(VadInstT* self, int mode) {
 // Calculate VAD decision by first extracting feature values and then calculate
 // probability for both speech and background noise.
 
-int WebRtcVad_CalcVad48khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad48khz(VadInstT* inst, const int16_t* speech_frame,
                            size_t frame_length) {
   int vad;
   size_t i;
@@ -624,12 +625,12 @@ int WebRtcVad_CalcVad48khz(VadInstT* inst, const int16_t* speech_frame,
   }
 
   // Do VAD on an 8 kHz signal
-  vad = WebRtcVad_CalcVad8khz(inst, speech_nb, frame_length / 6);
+  vad = wl_WebRtcVad_CalcVad8khz(inst, speech_nb, frame_length / 6);
 
   return vad;
 }
 
-int WebRtcVad_CalcVad32khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad32khz(VadInstT* inst, const int16_t* speech_frame,
                            size_t frame_length)
 {
     size_t len;
@@ -639,20 +640,20 @@ int WebRtcVad_CalcVad32khz(VadInstT* inst, const int16_t* speech_frame,
 
 
     // Downsample signal 32->16->8 before doing VAD
-    WebRtcVad_Downsampling(speech_frame, speechWB, &(inst->downsampling_filter_states[2]),
+    wl_WebRtcVad_Downsampling(speech_frame, speechWB, &(inst->downsampling_filter_states[2]),
                            frame_length);
     len = frame_length / 2;
 
-    WebRtcVad_Downsampling(speechWB, speechNB, inst->downsampling_filter_states, len);
+    wl_WebRtcVad_Downsampling(speechWB, speechNB, inst->downsampling_filter_states, len);
     len /= 2;
 
     // Do VAD on an 8 kHz signal
-    vad = WebRtcVad_CalcVad8khz(inst, speechNB, len);
+    vad = wl_WebRtcVad_CalcVad8khz(inst, speechNB, len);
 
     return vad;
 }
 
-int WebRtcVad_CalcVad16khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad16khz(VadInstT* inst, const int16_t* speech_frame,
                            size_t frame_length)
 {
     size_t len;
@@ -660,26 +661,30 @@ int WebRtcVad_CalcVad16khz(VadInstT* inst, const int16_t* speech_frame,
     int16_t speechNB[240]; // Downsampled speech frame: 480 samples (30ms in WB)
 
     // Wideband: Downsample signal before doing VAD
-    WebRtcVad_Downsampling(speech_frame, speechNB, inst->downsampling_filter_states,
+    wl_WebRtcVad_Downsampling(speech_frame, speechNB, inst->downsampling_filter_states,
                            frame_length);
 
     len = frame_length / 2;
-    vad = WebRtcVad_CalcVad8khz(inst, speechNB, len);
+    vad = wl_WebRtcVad_CalcVad8khz(inst, speechNB, len);
 
     return vad;
 }
 
-int WebRtcVad_CalcVad8khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad8khz(VadInstT* inst, const int16_t* speech_frame,
                           size_t frame_length)
 {
     int16_t feature_vector[kNumChannels], total_power;
 
+    DUMP16("%5d,",speech_frame,30);
     // Get power in the bands
-    total_power = WebRtcVad_CalculateFeatures(inst, speech_frame, frame_length,
+    total_power = wl_WebRtcVad_CalculateFeatures(inst, speech_frame, frame_length,
                                               feature_vector);
 
     // Make a VAD
     inst->vad = GmmProbability(inst, feature_vector, total_power, frame_length);
 
+
+    TRACE("total_power:%d vad:%d ",total_power,inst->vad);
+    
     return inst->vad;
 }

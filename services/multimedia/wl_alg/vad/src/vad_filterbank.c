@@ -13,6 +13,7 @@
 #include "checks.h"
 #include "signal_processing_library.h"
 #include "typedefs.h"
+#include "hal_trace.h"
 
 // Constants used in LogOfEnergy().
 static const int16_t kLogConst = 24660;  // 160*log10(2) in Q9.
@@ -165,10 +166,14 @@ static void LogOfEnergy(const int16_t* data_in, size_t data_length,
   energy = (uint32_t) wl_WebRtcSpl_Energy((int16_t*) data_in, data_length,
                                        &tot_rshifts);
 
+  TRACE("aaa energy:%d total_energy:%d tot_rshifts:%d ",energy,*total_energy,tot_rshifts);
+
   if (energy != 0) {
     // By construction, normalizing to 15 bits is equivalent with 17 leading
     // zeros of an unsigned 32 bit value.
     int normalizing_rshifts = 17 - WebRtcSpl_NormU32(energy);
+    TRACE("normalizing_rshifts:%d test:%d ",normalizing_rshifts,WebRtcSpl_NormU32(energy));
+
     // In a 15 bit representation the leading bit is 2^14. log2(2^14) in Q10 is
     // (14 << 10), which is what we initialize |log2_energy| with. For a more
     // detailed derivations, see below.
@@ -223,6 +228,8 @@ static void LogOfEnergy(const int16_t* data_in, size_t data_length,
 
   *log_energy += offset;
 
+  TRACE("bbb energy:%d total_energy:%d tot_rshifts:%d ",energy,*total_energy,tot_rshifts);
+
   // Update the approximate |total_energy| with the energy of |data_in|, if
   // |total_energy| has not exceeded |kMinEnergy|. |total_energy| is used as an
   // energy indicator in WebRtcVad_GmmProbability() in vad_core.c.
@@ -239,9 +246,11 @@ static void LogOfEnergy(const int16_t* data_in, size_t data_length,
       *total_energy += (int16_t) (energy >> -tot_rshifts);  // Q0.
     }
   }
+
+
 }
 
-int16_t WebRtcVad_CalculateFeatures(VadInstT* self, const int16_t* data_in,
+int16_t wl_WebRtcVad_CalculateFeatures(VadInstT* self, const int16_t* data_in,
                                     size_t data_length, int16_t* features) {
   int16_t total_energy = 0;
   // We expect |data_length| to be 80, 160 or 240 samples, which corresponds to
@@ -280,8 +289,12 @@ int16_t WebRtcVad_CalculateFeatures(VadInstT* self, const int16_t* data_in,
 
   LogOfEnergy(hp_60, length, kOffsetVector[5], &total_energy, &features[5]);
 
+
   // Energy in 2000 Hz - 3000 Hz.
   LogOfEnergy(lp_60, length, kOffsetVector[4], &total_energy, &features[4]);
+
+
+  //TRACE("aa total_energy:%d",total_energy);
 
   // For the lower band (0 Hz - 2000 Hz) split at 1000 Hz and downsample.
   frequency_band = 2;
@@ -308,6 +321,7 @@ int16_t WebRtcVad_CalculateFeatures(VadInstT* self, const int16_t* data_in,
   length >>= 1;  // |data_length| / 8 <=> bandwidth = 500 Hz.
   LogOfEnergy(hp_120, length, kOffsetVector[2], &total_energy, &features[2]);
 
+
   // For the lower band (0 Hz - 500 Hz) split at 250 Hz and downsample.
   frequency_band = 4;
   in_ptr = lp_120;  // [0 - 500] Hz.
@@ -319,6 +333,7 @@ int16_t WebRtcVad_CalculateFeatures(VadInstT* self, const int16_t* data_in,
   // Energy in 250 Hz - 500 Hz.
   length >>= 1;  // |data_length| / 16 <=> bandwidth = 250 Hz.
   LogOfEnergy(hp_60, length, kOffsetVector[1], &total_energy, &features[1]);
+
 
   // Remove 0 Hz - 80 Hz, by high pass filtering the lower band.
   HighPassFilter(lp_60, length, self->hp_filter_state, hp_120);

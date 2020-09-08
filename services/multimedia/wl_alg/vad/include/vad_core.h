@@ -59,7 +59,7 @@ typedef struct VadInstT_ {
 //
 // returns      : 0 (OK), -1 (null pointer in or if the default mode can't be
 //                set)
-int WebRtcVad_InitCore(VadInstT* self);
+int wl_WebRtcVad_InitCore(VadInstT* self);
 
 /****************************************************************************
  * WebRtcVad_set_mode_core(...)
@@ -78,7 +78,7 @@ int WebRtcVad_InitCore(VadInstT* self);
  *                    -1 - Error
  */
 
-int WebRtcVad_set_mode_core(VadInstT* self, int mode);
+int wl_WebRtcVad_set_mode_core(VadInstT* self, int mode);
 
 /****************************************************************************
  * WebRtcVad_CalcVad48khz(...)
@@ -100,13 +100,13 @@ int WebRtcVad_set_mode_core(VadInstT* self, int mode);
  *                        0 - No active speech
  *                        1-6 - Active speech
  */
-int WebRtcVad_CalcVad48khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad48khz(VadInstT* inst, const int16_t* speech_frame,
                            size_t frame_length);
-int WebRtcVad_CalcVad32khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad32khz(VadInstT* inst, const int16_t* speech_frame,
                            size_t frame_length);
-int WebRtcVad_CalcVad16khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad16khz(VadInstT* inst, const int16_t* speech_frame,
                            size_t frame_length);
-int WebRtcVad_CalcVad8khz(VadInstT* inst, const int16_t* speech_frame,
+int wl_WebRtcVad_CalcVad8khz(VadInstT* inst, const int16_t* speech_frame,
                           size_t frame_length);
 
 #endif  // WEBRTC_COMMON_AUDIO_VAD_VAD_CORE_H_

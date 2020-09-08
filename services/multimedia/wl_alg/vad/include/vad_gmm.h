@@ -31,7 +31,7 @@
 // Return:
 //   (probability for |input|) =
 //    1 / |std| * exp(-(|input| - |mean|)^2 / (2 * |std|^2));
-int32_t WebRtcVad_GaussianProbability(int16_t input,
+int32_t wl_WebRtcVad_GaussianProbability(int16_t input,
                                       int16_t mean,
                                       int16_t std,
                                       int16_t* delta);
