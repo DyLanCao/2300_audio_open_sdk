@@ -32,6 +32,7 @@ void app_wl_smartvoice_algorithm_denoise_level_set(uint8_t level)
 
 void app_wl_smartvoice_algorithm_init(uint8_t* nsx_heap)
 {
+
 #ifdef WL_NSX
     wl_nsx_denoise_init(16000, nsx_level, nsx_heap);
 #endif
@@ -44,9 +45,10 @@ void app_wl_smartvoice_algorithm_deinit(void)
 
 void app_wl_smartvoice_algorithm_process(uint8_t* data, uint16_t len)
 {
+
 #ifdef WL_NSX
     uint16_t sample_cnt;
-    //uint32_t now;
+    uint32_t now;
     short* in;
     static short out[APP_WL_SMARTVOICE_SAMPLE_COUNT_OF_10MS];
 
@@ -56,9 +58,9 @@ void app_wl_smartvoice_algorithm_process(uint8_t* data, uint16_t len)
 
     if (b_nsx_denoise) {
         for (int i=0; i<sample_cnt/APP_WL_SMARTVOICE_SAMPLE_COUNT_OF_10MS; i++) {
-            //now = hal_sys_timer_get();
+            now = hal_sys_timer_get();
             wl_nsx_16k_denoise(in+i*APP_WL_SMARTVOICE_SAMPLE_COUNT_OF_10MS, out);
-            //WL_SV_DEBUG("denoise, i: %d %d ms", i, TICKS_TO_MS(hal_sys_timer_get() - now));
+            WL_SV_DEBUG("denoise, i: %d %d ms", i, TICKS_TO_MS(hal_sys_timer_get() - now));
             memcpy(in+i*APP_WL_SMARTVOICE_SAMPLE_COUNT_OF_10MS, out, sizeof(out));
         }
     }

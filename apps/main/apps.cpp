@@ -1471,6 +1471,12 @@ int app_init(void)
     while(1);
 #endif
 
+
+#ifdef OPUS_LOOPBACK
+    app_wl_smartvoice_player(true, APP_SYSFREQ_208M);
+    while(1);
+#endif
+
     btdrv_start_bt();
     if (pwron_case != APP_POWERON_CASE_TEST) {
         BesbtInit();

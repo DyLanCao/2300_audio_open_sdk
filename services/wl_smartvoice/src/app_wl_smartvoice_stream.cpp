@@ -20,6 +20,10 @@
 #include "cqueue.h"
 #include "app_overlay.h"
 
+#ifdef AUDIO_DEBUG
+#include "audio_dump.h"
+#endif
+
 #ifdef __APP_WL_SMARTVOICE_LOOP_TEST__
 
 static enum APP_AUDIO_CACHE_T voice_cache_status = APP_AUDIO_CACHE_QTY;
@@ -143,9 +147,10 @@ static uint32_t app_wl_smartvoice_capture_data(uint8_t *buf, uint32_t len)
     WL_SV_FUNC_ENTER();
 
     //WL_SV_DEBUG("capture len: %d", len);
-
+    DUMP16("%d,",(short*)buf,30);
+    
     // 先过一遍降噪算法
-    app_wl_smartvoice_algorithm_process(buf, len);
+    //app_wl_smartvoice_algorithm_process(buf, len);
 
 #ifdef __APP_WL_SMARTVOICE_OPUS_ENCODE__
     uint8_t out[APP_WL_SMARTVOICE_OPUS_FRAME_ENCODE_SIZE];
@@ -160,7 +165,45 @@ static uint32_t app_wl_smartvoice_capture_data(uint8_t *buf, uint32_t len)
         memset(out, 0x00, APP_WL_SMARTVOICE_OPUS_FRAME_ENCODE_SIZE);
     }
 
-    WL_SV_DEBUG("opus encode :%d ms", TICKS_TO_MS(hal_sys_timer_get() - now));
+
+#ifdef AUDIO_DEBUG
+    static uint32_t dump_cnt = 0;
+
+    dump_cnt++;
+
+    #if 1
+    if(dump_cnt > 0x1FF)
+    {
+        audio_dump_clear_up();
+
+        // for(uint16_t iicnt = 0; iicnt < out_size; iicnt++)
+        // {
+        //     out[iicnt] = iicnt;
+        // }
+
+        audio_dump_add_channel_data(0, out, out_size>>1);
+        //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
+        //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
+
+        audio_dump_run();
+
+        dump_cnt = 0x4FF;
+    }
+
+    #else
+    audio_dump_clear_up();
+
+    audio_dump_add_channel_data(0, pcm_buff, pcm_len);
+    //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
+    //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
+
+    audio_dump_run();
+    #endif
+
+#endif
+
+
+    WL_SV_DEBUG("opus encode :%d ms encode_size:%d ", TICKS_TO_MS(hal_sys_timer_get() - now),out_size);
 
 #endif
 
@@ -248,6 +291,11 @@ int app_wl_smartvoice_player(bool on, enum APP_SYSFREQ_FREQ_T freq)
         uint8_t* opus_heap;
         app_audio_mempool_get_buff(&opus_heap, WL_SMARTVOICE_OPUS_CONFIG_HEAP_SIZE);
         wl_smartvoice_opus_init(opus_heap);
+#endif
+
+
+#ifdef AUDIO_DEBUG
+        audio_dump_init(20, sizeof(short), 1);
 #endif
 
         app_overlay_select(APP_OVERLAY_FM);

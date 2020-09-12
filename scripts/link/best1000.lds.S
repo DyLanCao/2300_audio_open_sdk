@@ -430,7 +430,7 @@ SECTIONS
 #ifdef VOICE_DATAPATH
 		*:opus_encoder.o(.text*)
 #else
-#if defined(__AI_VOICE__) && (RAM_SIZE >= 0x48000)
+#if defined(__APP_WL_SMARTVOICE_OPUS_ENCODE__) && (RAM_SIZE >= 0x48000)
 		*:voice_opus.o(.text*)
 		/**:opus_encoder.o(.text*)*/
 		*:opus_encoder.o(.text.frame_size_select)

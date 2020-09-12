@@ -360,6 +360,13 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
 #endif //high speech sample end
 
+#ifdef WL_DEBUG_MODE
+        if(nsx_cnt > 0xFFFF)
+        {
+            ASSERT(nsx_cnt == 0xff, "%s: wl_debug_mode raise crash ret=%d", __func__, nsx_cnt);
+        }
+#endif
+
 
 #ifdef AUDIO_DEBUG
     
@@ -399,7 +406,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("high sample 1 agc 14 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("high sample 2 agc 12 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
     
 #endif
@@ -765,7 +772,9 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 #if SPEECH_CODEC_CAPTURE_SAMPLE == 48000    
 
         stream_cfg.handler = app_high_data_come;
+
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 44100
+
         stream_cfg.handler = app_high_data_come;
 
 #else
