@@ -142,6 +142,9 @@ static void app_wl_smartvoice_sent_done(void)
     }
 }
 
+uint8_t out_opus[320];
+uint8_t opus_head[4] = {0x4f,0x67,0x67,0x53};
+uint8_t opus_lens[4] = {0x28,0x0,0x0,0x0};
 static uint32_t app_wl_smartvoice_capture_data(uint8_t *buf, uint32_t len)
 {
     WL_SV_FUNC_ENTER();
@@ -165,6 +168,16 @@ static uint32_t app_wl_smartvoice_capture_data(uint8_t *buf, uint32_t len)
         memset(out, 0x00, APP_WL_SMARTVOICE_OPUS_FRAME_ENCODE_SIZE);
     }
 
+    // for(uint16_t iicnt = 0; iicnt < out_size; iicnt++)
+    // {
+    //     out[iicnt] = iicnt;
+    // }
+
+    memcpy(out_opus,opus_head,4);
+    memcpy(out_opus + 4,opus_lens,4);
+    memset(buf,0x55,len);
+    memcpy(out_opus + 8,buf,152);
+    //DUMP8("0x%x,",out_opus,48);
 
 #ifdef AUDIO_DEBUG
     static uint32_t dump_cnt = 0;
@@ -181,7 +194,7 @@ static uint32_t app_wl_smartvoice_capture_data(uint8_t *buf, uint32_t len)
         //     out[iicnt] = iicnt;
         // }
 
-        audio_dump_add_channel_data(0, out, out_size>>1);
+        audio_dump_add_channel_data(0, out_opus, 160);
         //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
         //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
 
@@ -295,7 +308,7 @@ int app_wl_smartvoice_player(bool on, enum APP_SYSFREQ_FREQ_T freq)
 
 
 #ifdef AUDIO_DEBUG
-        audio_dump_init(20, sizeof(short), 1);
+        audio_dump_init(160, sizeof(short), 1);
 #endif
 
         app_overlay_select(APP_OVERLAY_FM);
