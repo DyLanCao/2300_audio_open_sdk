@@ -213,10 +213,10 @@ export DUMP_NORMAL_LOG ?= 0
 
 export DUMP_CRASH_LOG ?= 0
 
-export AUDIO_LOOPBACK ?= 0
+export AUDIO_LOOPBACK ?= 1
 
 
-export OPUS_LOOPBACK ?= 1
+export OPUS_LOOPBACK ?= 0
 
 
 export APP_LINEIN_SOURCE ?= 0
@@ -243,6 +243,7 @@ export NOTCH_FILTER ?= 0
 
 export WL_DEBUG_MODE ?= 1
 
+export WL_GPOI_SWITCH ?= 1
 
 SUPPORT_BATTERY_REPORT ?= 1
 

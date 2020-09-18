@@ -610,13 +610,20 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     }
 
     #else
-    audio_dump_clear_up();
 
-    audio_dump_add_channel_data(0, pcm_buff, pcm_len);
-    //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
-    //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
+#ifdef WL_GPIO_SWITCH
+    if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin)
+#endif
+    {
+        audio_dump_clear_up();
 
-    audio_dump_run();
+        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
+        //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
+        //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
+
+        audio_dump_run();
+    }
+
     #endif
 
 #endif
@@ -627,6 +634,10 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     if(false == (nsx_cnt & 0x3F))
     {
         TRACE("channel 1 agc 14 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+#ifdef WL_GPIO_SWITCH
+        TRACE("nsx_gpio_pin_value:%d", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin);
+#endif
+
     }
     
 #endif

@@ -1275,6 +1275,18 @@ extern "C" int app_bt_start_custom_function_in_bt_thread(
     uint32_t param0, uint32_t param1, uint32_t funcPtr);
 int btdrv_tportopen(void);
 
+
+#ifdef WL_GPIO_SWITCH
+void wl_gpio_init(void)
+{
+    if (app_wl_nsx_switch_detecter_cfg.pin != HAL_IOMUX_PIN_NUM)
+    {
+        hal_iomux_init((struct HAL_IOMUX_PIN_FUNCTION_MAP *)&app_wl_nsx_switch_detecter_cfg, 1);
+        hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin, HAL_GPIO_DIR_IN, 1);
+    }
+}
+#endif
+
 int app_init(void)
 {
     int nRet = 0;
@@ -1354,6 +1366,11 @@ int app_init(void)
 #ifdef BT_USB_AUDIO_DUAL_MODE
     usb_os_init();
 #endif
+
+#ifdef WL_GPIO_SWITCH
+    wl_gpio_init();
+#endif
+
     nRet = app_battery_open();
     TRACE("BATTERY %d",nRet);
     if (nRet < 0){
