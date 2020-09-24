@@ -110,6 +110,10 @@ extern const int8_t cfg_aud_eq_sbc_band_settings[CFG_HW_AUD_EQ_NUM_BANDS];
 extern const struct HAL_IOMUX_PIN_FUNCTION_MAP app_battery_ext_charger_detecter_cfg;
 extern const struct HAL_IOMUX_PIN_FUNCTION_MAP app_battery_ext_charger_indicator_cfg;
 
+#ifdef WL_GPIO_SWITCH
+extern const struct HAL_IOMUX_PIN_FUNCTION_MAP app_wl_nsx_switch_detecter_cfg;
+#endif
+
 #ifdef __cplusplus
 }
 #endif

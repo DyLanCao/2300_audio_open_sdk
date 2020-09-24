@@ -212,6 +212,7 @@ int communication_io_mode_switch(enum COMMUNICATION_MODE mode)
     }
 #if defined(CHIP_BEST2300) || defined(CHIP_BEST2300P)
     switch (mode) {
+#ifndef WL_GPIO_SWITCH
         case COMMUNICATION_MODE_TX: {
             const struct HAL_IOMUX_PIN_FUNCTION_MAP POSSIBLY_UNUSED pinmux_uart_1[] = {
                 {HAL_IOMUX_PIN_P2_0, HAL_IOMUX_FUNC_GPIO,     HAL_IOMUX_PIN_VOLTAGE_VIO, HAL_IOMUX_PIN_NOPULL},
@@ -228,6 +229,7 @@ int communication_io_mode_switch(enum COMMUNICATION_MODE mode)
             hal_iomux_init((struct HAL_IOMUX_PIN_FUNCTION_MAP *)pinmux_uart_1, ARRAY_SIZE(pinmux_uart_1));
             break;
         }
+#endif
         default:
             break;
     }
@@ -240,6 +242,8 @@ int communication_io_mode_switch(enum COMMUNICATION_MODE mode)
 int communication_io_mode_init(void)
 {
 #if defined(CHIP_BEST2300) || defined(CHIP_BEST2300P)
+
+#ifndef WL_GPIO_SWITCH
     const struct HAL_IOMUX_PIN_FUNCTION_MAP POSSIBLY_UNUSED pinmux_uart_1[] = {
         {HAL_IOMUX_PIN_P2_0, HAL_IOMUX_FUNC_UART1_RX, HAL_IOMUX_PIN_VOLTAGE_VIO, HAL_IOMUX_PIN_PULLUP_ENALBE},
         {HAL_IOMUX_PIN_P2_1, HAL_IOMUX_FUNC_UART1_TX, HAL_IOMUX_PIN_VOLTAGE_VIO, HAL_IOMUX_PIN_NOPULL},
@@ -247,6 +251,8 @@ int communication_io_mode_init(void)
     hal_iomux_init((struct HAL_IOMUX_PIN_FUNCTION_MAP *)pinmux_uart_1, ARRAY_SIZE(pinmux_uart_1));
     hal_gpio_pin_set_dir(HAL_GPIO_PIN_P2_1, HAL_GPIO_DIR_IN, 1);
     hal_gpio_pin_set_dir(HAL_GPIO_PIN_P2_0, HAL_GPIO_DIR_IN, 1);
+#endif
+
 #endif
     communication_io_mode_switch(COMMUNICATION_MODE_RX);
     return 0;

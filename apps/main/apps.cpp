@@ -129,6 +129,10 @@ extern "C" void app_enter_fastpairing_mode(void);
 #include "app_thirdparty.h"
 #endif
 
+#ifdef WL_GPIO_SWITCH
+#include "tgt_hardware.h"
+#endif
+
 
 
 #ifdef AUDIO_LOOPBACK
@@ -1284,6 +1288,7 @@ void wl_gpio_init(void)
         hal_iomux_init((struct HAL_IOMUX_PIN_FUNCTION_MAP *)&app_wl_nsx_switch_detecter_cfg, 1);
         hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin, HAL_GPIO_DIR_IN, 1);
     }
+
 }
 #endif
 

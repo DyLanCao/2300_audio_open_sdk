@@ -51,7 +51,6 @@
 
 # Libraries
 *.lib
-*.a
 *.la
 *.lai
 *.pyd

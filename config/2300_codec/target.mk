@@ -243,7 +243,7 @@ export NOTCH_FILTER ?= 0
 
 export WL_DEBUG_MODE ?= 1
 
-export WL_GPOI_SWITCH ?= 1
+export WL_GPIO_SWITCH ?= 1
 
 SUPPORT_BATTERY_REPORT ?= 1
 
