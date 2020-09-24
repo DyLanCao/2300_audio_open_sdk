@@ -172,6 +172,22 @@ void wl_nsx_denoise_init(int nSample,int nMode, uint8_t* nsx_heap)
     TRACE("WebRtcNs_denoise_initcccc:%d ",ret_val);
 
 }
+
+int32_t  filter_state1[6],filter_state12[6];
+int32_t  Synthesis_state1[6],Synthesis_state12[6];
+
+int16_t shInL[160],shInH[160];
+int16_t shOutL[160] = {0},shOutH[160] = {0};
+
+void wl_nsx_32k_state_init(void)
+{
+    memset(filter_state1,0,sizeof(filter_state1));
+    memset(filter_state12,0,sizeof(filter_state12));
+    memset(Synthesis_state1,0,sizeof(Synthesis_state1));
+    memset(Synthesis_state12,0,sizeof(Synthesis_state12));
+
+}
+
 //��ʼ���ز�������
 void nsx_resample_init(void)
 {
@@ -223,6 +239,38 @@ void WebRtcNsx_44k_denoise(short *i44k_buff, short *o44k_buff)
 #endif
     WebRtcSpl_Resample16khzTo22khz(array_o16k,array_22k,(WebRtcSpl_State16khzTo22khz*)state4_,array_o22k_buff);
     WebRtcSpl_UpsampleBy2(array_22k, tempSize_44k/2, o44k_buff,(int32_t*)(state2_));
+}
+
+void WebRtcNsx_high_sample_Alg_Process(short *shInL,short *shInH, short *shOutL, short *shOutH)
+{
+    int ret_val;
+
+  //  DEBUG2("WebRtcNs_denoise_initcccc:%d ",ret_val);
+   // memcpy(shBufferOut,shBufferIn,320);
+    ret_val = wl_WebRtcNsx_Process(ppNsxHandle, shInL, shInH, shOutL, shOutH);
+
+    if(ret_val !=0)
+    {   
+        TRACE("wrong 32k sample denoise process result ");
+    }   
+    //TRACE("WebRtcNs_denoise_process...........:%d \n",ret_val);
+
+    //ASSERT(0 == ret_val, "failed in WebRtcNsx_32K_Process :%d ",ret_val);
+
+}
+
+
+
+void wl_nsx_32k_denoise_process(const int16_t *i32k_buff, int16_t *o32k_buff)
+{
+    wl_WebRtcSpl_AnalysisQMF(i32k_buff,shInL,shInH,filter_state1,filter_state12);
+
+    WebRtcNsx_high_sample_Alg_Process(shInL,shInH,shOutL,shOutH);
+    //test_code(tmp_in);
+
+    //如果降噪成功，则根据降噪后高频和低频数据传入滤波接口，然后用将返回的数据写入文件
+    wl_WebRtcSpl_SynthesisQMF(shOutL,shOutH,o32k_buff,Synthesis_state1,Synthesis_state12);
+
 }
 
 int32_t array_i48k_buff[496];//in_48k_size, sizeof(int32_t)

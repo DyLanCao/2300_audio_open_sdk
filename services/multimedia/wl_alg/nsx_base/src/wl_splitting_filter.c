@@ -43,7 +43,7 @@ static const uint16_t WebRtcSpl_kAllPassFilter2[3] = {21333, 49062, 63010};
 //                            |data_length|
 //
 
-void WebRtcSpl_AllPassQMF(int32_t* in_data, int16_t data_length,
+void wl_WebRtcSpl_AllPassQMF(int32_t* in_data, int16_t data_length,
                           int32_t* out_data, const uint16_t* filter_coefficients,
                           int32_t* filter_state)
 {
@@ -116,7 +116,7 @@ void WebRtcSpl_AllPassQMF(int32_t* in_data, int16_t data_length,
     filter_state[5] = out_data[data_length - 1]; // y[N-1], becomes y[-1] next time
 }
 
-void WebRtcSpl_AnalysisQMF(const int16_t* in_data, int16_t* low_band,
+void wl_WebRtcSpl_AnalysisQMF(const int16_t* in_data, int16_t* low_band,
                            int16_t* high_band, int32_t* filter_state1,
                            int32_t* filter_state2)
 {
@@ -137,9 +137,9 @@ void WebRtcSpl_AnalysisQMF(const int16_t* in_data, int16_t* low_band,
     }
 
     // All pass filter even and odd samples, independently.
-    WebRtcSpl_AllPassQMF(half_in1, kBandFrameLength, filter1, WebRtcSpl_kAllPassFilter1,
+    wl_WebRtcSpl_AllPassQMF(half_in1, kBandFrameLength, filter1, WebRtcSpl_kAllPassFilter1,
                          filter_state1);
-    WebRtcSpl_AllPassQMF(half_in2, kBandFrameLength, filter2, WebRtcSpl_kAllPassFilter2,
+    wl_WebRtcSpl_AllPassQMF(half_in2, kBandFrameLength, filter2, WebRtcSpl_kAllPassFilter2,
                          filter_state2);
 
     // Take the sum and difference of filtered version of odd and even
@@ -156,7 +156,7 @@ void WebRtcSpl_AnalysisQMF(const int16_t* in_data, int16_t* low_band,
     }
 }
 
-void WebRtcSpl_SynthesisQMF(const int16_t* low_band, const int16_t* high_band,
+void wl_WebRtcSpl_SynthesisQMF(const int16_t* low_band, const int16_t* high_band,
                             int16_t* out_data, int32_t* filter_state1,
                             int32_t* filter_state2)
 {
@@ -179,9 +179,9 @@ void WebRtcSpl_SynthesisQMF(const int16_t* low_band, const int16_t* high_band,
     }
 
     // all-pass filter the sum and difference channels
-    WebRtcSpl_AllPassQMF(half_in1, kBandFrameLength, filter1, WebRtcSpl_kAllPassFilter2,
+    wl_WebRtcSpl_AllPassQMF(half_in1, kBandFrameLength, filter1, WebRtcSpl_kAllPassFilter2,
                          filter_state1);
-    WebRtcSpl_AllPassQMF(half_in2, kBandFrameLength, filter2, WebRtcSpl_kAllPassFilter1,
+    wl_WebRtcSpl_AllPassQMF(half_in2, kBandFrameLength, filter2, WebRtcSpl_kAllPassFilter1,
                          filter_state2);
 
     // The filtered signals are even and odd samples of the output. Combine

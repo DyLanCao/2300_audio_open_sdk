@@ -359,6 +359,11 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000
 
+    //WebRtcNsx_44k_denoise(pcm_buff,out_buff);
+    wl_nsx_32k_denoise_process(pcm_buff,out_buff);
+
+    memset(pcm_buff,0x0,len);
+    memcpy(pcm_buff,out_buff,len);
 #else
 
 #ifdef WL_NSX

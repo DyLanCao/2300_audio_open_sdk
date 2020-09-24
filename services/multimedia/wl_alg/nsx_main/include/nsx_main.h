@@ -15,6 +15,7 @@ void wl_nsx_16k_denoise(short *i16k_buff, short *o16k_buff);
 void wl_nsx_denoise_init(int nSample,int nMode, uint8_t* nsx_heap);
 void nsx_resample_init(void);
 int nsx_mempool_get_buff(uint16_t **buff, uint32_t size);
+void wl_nsx_32k_denoise_process(const int16_t *i32k_buff, int16_t *o32k_buff);
 #endif
 
 
