@@ -77,9 +77,13 @@
 
 #define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(3*320*2)
 
-#elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 44100  
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 44100  
 
 #define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(440*4)
+
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000  
+
+#define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(2*320*2)
 
 #else
 
@@ -200,7 +204,7 @@ void aaudio_div_four_to_mono_four(int16_t *dst_buf, int16_t *src_buf, uint32_t s
 
 
 
-#if SPEECH_CODEC_CAPTURE_SAMPLE == 48000 || SPEECH_CODEC_CAPTURE_SAMPLE == 44100
+#if SPEECH_CODEC_CAPTURE_SAMPLE == 48000 || SPEECH_CODEC_CAPTURE_SAMPLE == 44100 || SPEECH_CODEC_CAPTURE_SAMPLE == 32000
 
 static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 {
@@ -347,11 +351,13 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
     memset(pcm_buff,0x0,len);
     memcpy(pcm_buff,out_buff,len);
 
-#elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 44100  
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 44100  
 
     WebRtcNsx_44k_denoise(pcm_buff,out_buff);
     memset(pcm_buff,0x0,len);
     memcpy(pcm_buff,out_buff,len);
+
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000
 
 #else
 
@@ -721,11 +727,17 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         wl_nsx_denoise_init(16000,1, nsx_heap);
         nsx_resample_init();
 
-#elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 44100  
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 44100  
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
         wl_nsx_denoise_init(16000,1, nsx_heap);
+        nsx_resample_init();
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000  
+        app_overlay_select(APP_OVERLAY_FM);
+        uint8_t* nsx_heap;
+        app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
+        wl_nsx_denoise_init(32000,1, nsx_heap);
         nsx_resample_init();
 #else
 
@@ -771,6 +783,8 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         stream_cfg.sample_rate = AUD_SAMPRATE_48000;
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 44100 
         stream_cfg.sample_rate = AUD_SAMPRATE_44100;
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000 
+        stream_cfg.sample_rate = AUD_SAMPRATE_32000;
 #else
         stream_cfg.sample_rate = AUD_SAMPRATE_16000;
 #endif
@@ -791,6 +805,10 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         stream_cfg.handler = app_high_data_come;
 
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 44100
+
+        stream_cfg.handler = app_high_data_come;
+
+#elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000
 
         stream_cfg.handler = app_high_data_come;
 

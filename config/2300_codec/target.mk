@@ -228,22 +228,22 @@ export WL_NSX ?= 1
 export WL_AGC ?= 0
 
 
-export WL_HIGH_SAMPLE ?= 0
+export WL_HIGH_SAMPLE ?= 1
 
 
 
 export WL_VAD ?= 0
 
-export AUDIO_DEBUG ?= 1
+export AUDIO_DEBUG ?= 0
 
 export GCC_PLAT ?= 0
 
 export NOTCH_FILTER ?= 0
 
 
-export WL_DEBUG_MODE ?= 1
+export WL_DEBUG_MODE ?= 0
 
-export WL_GPIO_SWITCH ?= 1
+export WL_GPIO_SWITCH ?= 0
 
 SUPPORT_BATTERY_REPORT ?= 1
 
