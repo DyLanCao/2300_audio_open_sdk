@@ -359,11 +359,21 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000
 
-    //WebRtcNsx_44k_denoise(pcm_buff,out_buff);
+
     wl_nsx_32k_denoise_process(pcm_buff,out_buff);
 
     memset(pcm_buff,0x0,len);
     memcpy(pcm_buff,out_buff,len);
+
+#ifdef AUDIO_DEBUG
+    
+    audio_dump_clear_up();
+
+    audio_dump_add_channel_data(0, pcm_buff, pcm_len);
+
+    audio_dump_run();
+#endif
+
 #else
 
 #ifdef WL_NSX
@@ -375,14 +385,6 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 #endif
 
 #endif //high speech sample end
-
-#ifdef WL_DEBUG_MODE
-        if(nsx_cnt > 0xFFFF)
-        {
-            ASSERT(nsx_cnt == 0xff, "%s: wl_debug_mode raise crash ret=%d", __func__, nsx_cnt);
-        }
-#endif
-
 
 #ifdef AUDIO_DEBUG
     
@@ -420,9 +422,17 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
 
 
+#ifdef WL_DEBUG_MODE
+    if(nsx_cnt > 0xFFFF)
+    {
+        ASSERT(nsx_cnt == 0xff, "%s: wl_debug_mode raise crash ret=%d", __func__, nsx_cnt);
+    }
+#endif
+
+
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("high sample 2 agc 12 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("high sample 32k no denoise agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
     
 #endif
