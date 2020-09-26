@@ -754,21 +754,27 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
         wl_nsx_denoise_init(32000,1, nsx_heap);
         nsx_resample_init();
+
+        #ifdef WEBRTC_AGC_32K
+        wl_agc_32k_init();
+        #endif
+
 #else
 
 #ifdef WL_NSX
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,1, nsx_heap);
+        wl_nsx_denoise_init(16000,2, nsx_heap);
 
+#endif
+
+#ifdef WEBRTC_AGC
+        WebRtcAgc_init();
 #endif
 
 #endif // speech high end
  
-#ifdef WEBRTC_AGC
-        WebRtcAgc_init();
-#endif
 
 #ifdef WL_VAD
         wl_vad_init();

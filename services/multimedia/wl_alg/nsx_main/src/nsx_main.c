@@ -260,12 +260,20 @@ void WebRtcNsx_high_sample_Alg_Process(short *shInL,short *shInH, short *shOutL,
 }
 
 
-
+int16_t tmp_out[160],tmp_out_H[160];
 void wl_nsx_32k_denoise_process(const int16_t *i32k_buff, int16_t *o32k_buff)
 {
     wl_WebRtcSpl_AnalysisQMF(i32k_buff,shInL,shInH,filter_state1,filter_state12);
 
+    #ifdef WEBRTC_AGC_32K
+    wl_agc_32k_alg_process(shInL,shInH,tmp_out,tmp_out_H);
+    WebRtcNsx_high_sample_Alg_Process(tmp_out,tmp_out_H,shOutL,shOutH);
+    //wl_agc_32k_alg_process(shInL,shInH,shOutL,shOutH);
+    //DUMP16("%5d,",(short*)shOutL,30);
+    #else
     WebRtcNsx_high_sample_Alg_Process(shInL,shInH,shOutL,shOutH);
+    #endif
+
     //test_code(tmp_in);
 
     //如果降噪成功，则根据降噪后高频和低频数据传入滤波接口，然后用将返回的数据写入文件
