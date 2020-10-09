@@ -87,7 +87,11 @@
 
 #else
 
+#ifdef WL_NSX_5MS
+#define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(160*2)
+#else
 #define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(320*2)
+#endif
 
 #endif
 
@@ -660,7 +664,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("channel 1 agc 14 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("mic 2 agc 14 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
 #ifdef WL_GPIO_SWITCH
         TRACE("nsx_gpio_pin_value:%d ", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin));
 #endif

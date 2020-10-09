@@ -647,7 +647,11 @@ int32_t wl_WebRtcNsx_InitCore(NsxInst_t* inst, uint32_t fs) {
     inst->maxLrt = 0x0040000;
     inst->minLrt = 52429;
   } else if (fs == 16000) {
+#ifdef WL_NSX_5MS
+    inst->blockLen10ms = 80;
+#else
     inst->blockLen10ms = 160;
+#endif
     inst->anaLen = 256;
     inst->stages = 8;
     inst->window = kBlocks160w256x;

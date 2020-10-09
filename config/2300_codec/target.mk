@@ -225,12 +225,12 @@ export APP_LINEIN_SOURCE ?= 0
 export WL_NSX ?= 1
 
 
-export WL_AGC ?= 1
+export WL_AGC ?= 0
 
 
-export WL_AGC_32K ?= 1
+export WL_AGC_32K ?= 0
 
-export WL_HIGH_SAMPLE ?= 1
+export WL_HIGH_SAMPLE ?= 0
 
 
 
@@ -246,6 +246,9 @@ export NOTCH_FILTER ?= 0
 export WL_DEBUG_MODE ?= 1
 
 export WL_GPIO_SWITCH ?= 0
+
+
+export WL_NSX_5MS ?= 1
 
 SUPPORT_BATTERY_REPORT ?= 1
 
