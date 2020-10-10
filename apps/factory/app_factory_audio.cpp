@@ -274,7 +274,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 1 right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+        TRACE("mic 1 right agc 8 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
 
@@ -612,7 +612,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 #ifdef WL_NSX
 
     wl_nsx_16k_denoise(pcm_buff,out_buff);
-    memset(pcm_buff,0x0,len);
+    //memset(pcm_buff,0x0,len);
     memcpy(pcm_buff,out_buff,len);
 
 #endif
@@ -664,7 +664,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 2 agc 14 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("mic 1 agc 8 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
 #ifdef WL_GPIO_SWITCH
         TRACE("nsx_gpio_pin_value:%d ", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin));
 #endif
@@ -770,7 +770,6 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
         wl_nsx_denoise_init(16000,2, nsx_heap);
-
 #endif
 
 #ifdef WEBRTC_AGC

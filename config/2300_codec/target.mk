@@ -248,7 +248,7 @@ export WL_DEBUG_MODE ?= 1
 export WL_GPIO_SWITCH ?= 0
 
 
-export WL_NSX_5MS ?= 1
+export WL_NSX_5MS ?= 0
 
 SUPPORT_BATTERY_REPORT ?= 1
 

@@ -771,7 +771,10 @@ SECTIONS
 		*:division_operations.o(.text*)
 		*:get_scaling_square.o(.text*)
 		*:spl_init.o(.text*)
-		*:wl_nsx_main.o(.text*)
+		*:wl_nsx_core.o(.text*)
+		*:nsx_main.o(.text*)
+		*:wl_splitting_filter.o(.text*)
+		*:wl_noise_suppression_x.o(.text*)
 
 #endif
 
@@ -1045,6 +1048,26 @@ SECTIONS
 		{
 			LONG(0);
 			*:fft128dot.o(.data* .rodata*)
+#if defined(WL_NSX)
+		*:complex_bit_reverse.o(.data* .rodata*)
+		*:copy_set_operations.o(.data* .rodata*)
+		*:downsample_fast.o(.data* .rodata*)
+		*:cross_correlation.o(.data* .rodata*)
+		*:energy.o(.data* .rodata*)
+		*:real_fft.o(.data* .rodata*)
+		*:min_max_operations.o(.data* .rodata*)
+		*:spl_sqrt_floor.o(.data* .rodata*)
+		*:complex_fft.o(.data* .rodata*)
+		*:vector_scaling_operations.o(.data* .rodata*)
+		*:division_operations.o(.data* .rodata*)
+		*:get_scaling_square.o(.data* .rodata*)
+		*:spl_init.o(.data* .rodata*)
+		*:wl_nsx_core.o(.data* .rodata*)
+		*:nsx_main.o(.data* .rodata*)
+		*:wl_splitting_filter.o(.data* .rodata*)
+		*:wl_noise_suppression_x.o(.data* .rodata*)
+
+#endif
 			*(.overlay_data3 .overlay_rodata3)
 			. = ALIGN(4);
 		}
