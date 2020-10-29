@@ -133,6 +133,9 @@ extern "C" void app_enter_fastpairing_mode(void);
 #include "tgt_hardware.h"
 #endif
 
+#ifdef WL_LED_ZG_SWITCH
+#include "tgt_hardware.h" 
+#endif
 
 
 #ifdef AUDIO_LOOPBACK
@@ -177,11 +180,13 @@ uint8_t  app_poweroff_flag = 0;
 #ifndef APP_TEST_MODE
 static uint8_t app_status_indication_init(void)
 {
+#ifndef WL_LED_ZG_SWITCH
     struct APP_PWL_CFG_T cfg;
     memset(&cfg, 0, sizeof(struct APP_PWL_CFG_T));
     app_pwl_open();
     app_pwl_setup(APP_PWL_ID_0, &cfg);
-    app_pwl_setup(APP_PWL_ID_1, &cfg);
+    app_pwl_setup(APP_PWL_ID_1, &cfg);   
+#endif 
     return 0;
 }
 #endif
@@ -1292,6 +1297,19 @@ void wl_gpio_init(void)
 }
 #endif
 
+#ifdef WL_LED_ZG_SWITCH
+void wl_gpio_zg_init(void)
+{
+    if (app_wl_zg_mute_switch_cfg.pin != HAL_IOMUX_PIN_NUM)
+    {
+        hal_iomux_init((struct HAL_IOMUX_PIN_FUNCTION_MAP *)&app_wl_zg_mute_switch_cfg.pin, 1);
+        hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin, HAL_GPIO_DIR_IN, 1);
+        TRACE("wl_gpio_zg_init:%d ", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin));
+    }
+
+}
+#endif
+
 int app_init(void)
 {
     int nRet = 0;
@@ -1374,6 +1392,10 @@ int app_init(void)
 
 #ifdef WL_GPIO_SWITCH
     wl_gpio_init();
+#endif
+
+#ifdef WL_LED_ZG_SWITCH
+    wl_gpio_zg_init();
 #endif
 
     nRet = app_battery_open();

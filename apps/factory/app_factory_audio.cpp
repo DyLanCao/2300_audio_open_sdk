@@ -71,6 +71,10 @@
 #include "tgt_hardware.h"
 #endif
 
+#ifdef WL_LED_ZG_SWITCH
+#include "tgt_hardware.h" 
+#endif
+
 #ifdef __FACTORY_MODE_SUPPORT__
 
 #if SPEECH_CODEC_CAPTURE_SAMPLE == 48000    
@@ -368,6 +372,12 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
     memset(pcm_buff,0x0,len);
     memcpy(pcm_buff,out_buff,len);
+ #ifdef WL_LED_ZG_SWITCH
+        if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin))
+        {
+            memset(pcm_buff,0x0,len);
+        }
+#endif   
 
 #ifdef AUDIO_DEBUG
     
@@ -438,7 +448,18 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
     {
         TRACE("high sample 32k no denoise agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
-    
+ #ifdef WL_LED_ZG_SWITCH
+        if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin))
+        {
+            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[0].pin,HAL_GPIO_DIR_OUT,1);
+            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[1].pin,HAL_GPIO_DIR_OUT,0);
+        }
+        else
+        {
+            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[0].pin,HAL_GPIO_DIR_OUT,0);
+            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[1].pin,HAL_GPIO_DIR_OUT,1);
+        }
+#endif   
 #endif
 
     if (a2dp_cache_status == APP_AUDIO_CACHE_QTY){
