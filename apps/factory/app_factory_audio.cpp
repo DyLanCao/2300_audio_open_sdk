@@ -209,6 +209,61 @@ void aaudio_div_four_to_mono_four(int16_t *dst_buf, int16_t *src_buf, uint32_t s
 }
 #endif
 
+#ifdef WL_LED_ZG_SWITCH
+bool mute_switch=false;
+uint8_t mute_key_state=0;
+
+#define KEY_CNT_MIN      20
+#define KEY_CNT_MAX     50
+
+uint32_t vad_step_count_process(int vad_cnt)
+{
+    static uint32_t tmp_count = 0;
+    static uint32_t last_count = 0;
+
+    uint32_t ret = 0;
+
+    if(vad_cnt)
+    {
+        tmp_count = 0;
+    }
+    else
+    {
+        tmp_count++;
+    }
+    
+    if(tmp_count < last_count)
+    {
+        TRACE("tmp_count:%d last_count:%d \n\t",tmp_count,last_count);
+        if((last_count > KEY_CNT_MIN) && (last_count < KEY_CNT_MAX))
+        {
+            ret = 1;
+        }
+    }
+
+    last_count = tmp_count;
+
+    return ret;
+}
+
+static void app_zg_mute_mode_switch(void)
+{
+    if(mute_switch)
+    {
+        mute_switch=false;
+    }
+    else
+    {
+        mute_switch=true;
+    }
+    
+}
+
+static bool app_zg_mute_mode_get(void)
+{
+    return mute_switch;
+}
+#endif
 
 
 
@@ -373,7 +428,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
     memset(pcm_buff,0x0,len);
     memcpy(pcm_buff,out_buff,len);
  #ifdef WL_LED_ZG_SWITCH
-        if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin))
+        if(app_zg_mute_mode_get())
         {
             memset(pcm_buff,0x0,len);
         }
@@ -449,16 +504,25 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
         TRACE("high sample 32k no denoise agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
  #ifdef WL_LED_ZG_SWITCH
-        if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin))
-        {
-            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[0].pin,HAL_GPIO_DIR_OUT,1);
-            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[1].pin,HAL_GPIO_DIR_OUT,0);
-        }
-        else
-        {
-            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[0].pin,HAL_GPIO_DIR_OUT,0);
-            hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[1].pin,HAL_GPIO_DIR_OUT,1);
-        }
+
+    mute_key_state = vad_step_count_process(hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin));
+    if(mute_key_state)
+    {
+        TRACE("mute %d",app_zg_mute_mode_get());
+
+        app_zg_mute_mode_switch();
+    }
+    
+    if(app_zg_mute_mode_get())
+    {
+        hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[0].pin,HAL_GPIO_DIR_OUT,1);
+        hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[1].pin,HAL_GPIO_DIR_OUT,0);
+    }
+    else
+    {
+        hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[0].pin,HAL_GPIO_DIR_OUT,0);
+        hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[1].pin,HAL_GPIO_DIR_OUT,1);
+    }
 #endif   
 #endif
 
