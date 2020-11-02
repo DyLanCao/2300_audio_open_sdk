@@ -109,6 +109,7 @@ static int16_t *app_audioloop_play_cache = NULL;
 
 
 short out_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+short revert_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
@@ -705,6 +706,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     //memset(pcm_buff,0x0,len);
     memcpy(pcm_buff,out_buff,len);
 
+#ifdef WL_STEREO_AUDIO
+    for(uint32_t inum = 0; inum<pcm_len;inum++)
+    {
+        revert_buff[inum] = -pcm_buff[inum];
+    }
+#endif
+
 #endif
 
 
@@ -738,6 +746,10 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
         audio_dump_clear_up();
 
         audio_dump_add_channel_data(0, pcm_buff, pcm_len);
+
+#ifdef WL_STEREO_AUDIO
+        audio_dump_add_channel_data(1, revert_buff, pcm_len);
+#endif
         //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
         //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
 
@@ -886,7 +898,12 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 #endif
 
 #ifdef AUDIO_DEBUG
+#ifdef WL_STEREO_AUDIO
+        audio_dump_init(BT_AUDIO_FACTORMODE_BUFF_SIZE>>2, sizeof(short), 2);
+#else
         audio_dump_init(BT_AUDIO_FACTORMODE_BUFF_SIZE>>2, sizeof(short), 1);
+#endif
+
 #endif
 
 #if defined(__AUDIO_RESAMPLE__) && defined(SW_CAPTURE_RESAMPLE)
