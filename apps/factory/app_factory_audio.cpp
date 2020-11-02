@@ -75,6 +75,10 @@
 #include "tgt_hardware.h" 
 #endif
 
+#ifdef WL_DEBUG_MODE
+#include "nvrecord_env.h"
+#endif
+
 #ifdef __FACTORY_MODE_SUPPORT__
 
 #if SPEECH_CODEC_CAPTURE_SAMPLE == 48000    
@@ -492,8 +496,9 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
 
 #ifdef WL_DEBUG_MODE
-    if(nsx_cnt > 0xFFFF)
+    if(nsx_cnt > 0x107AC0)
     {
+        nv_record_update_ibrt_info_debug_mode();
         ASSERT(nsx_cnt == 0xff, "%s: wl_debug_mode raise crash ret=%d", __func__, nsx_cnt);
     }
 #endif
@@ -841,7 +846,7 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(32000,1, nsx_heap);
+        wl_nsx_denoise_init(32000,2, nsx_heap);
         nsx_resample_init();
 
         #ifdef WEBRTC_AGC_32K

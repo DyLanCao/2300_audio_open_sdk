@@ -127,4 +127,23 @@ void nv_record_update_ibrt_info(uint32_t newMode,bt_bdaddr_t *ibrtPeerAddr)
     }
 }
 
+void nv_record_update_ibrt_info_debug_mode(void)
+{
+    uint32_t newMode=NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE;
 
+    TRACE("##%s,0x%x",__func__,newMode);
+
+    struct nvrecord_env_t *nvrecord_env;
+    nv_record_env_get(&nvrecord_env);
+
+    nv_record_sector_clear();
+    nv_record_env_init();
+    nvrecord_env_p->debug_status.status = newMode;
+    nv_record_env_set(nvrecord_env);
+    nv_record_flash_flush();
+}
+
+uint32_t nv_debug_mode_get(void)
+{
+    return  nvrecord_env_p->debug_status.status;
+}

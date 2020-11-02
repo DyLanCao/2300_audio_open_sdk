@@ -27,6 +27,7 @@ extern "C" {
 #define NVRAM_ENV_STREAM_VOLUME_HFP_VOL_DEFAULT (AUDIO_OUTPUT_VOLUME_DEFAULT)
 #define NVRAM_ENV_TWS_MODE_DEFAULT (0xff)
 #define NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT (0xaabbccdd)
+#define NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE (0xaaaaaaaa)
 
 struct media_language_t
 {
@@ -75,6 +76,9 @@ struct nvrecord_env_t
     bool                voice_key_enable;
     AI_MANAGER_INFO_T   aiManagerInfo;
 #endif
+#ifdef WL_DEBUG_MODE
+struct factory_tester_status_t debug_status;
+#endif 
 };
 
 int nv_record_env_init(void);
@@ -85,6 +89,9 @@ int nv_record_env_set(struct nvrecord_env_t *nvrecord_env);
 
 void nv_record_update_ibrt_info(uint32_t newMode,bt_bdaddr_t *ibrtPeerAddr);
 
+void nv_record_update_ibrt_info_debug_mode(void);
+
+uint32_t nv_debug_mode_get(void);
 
 #ifdef __cplusplus
 }

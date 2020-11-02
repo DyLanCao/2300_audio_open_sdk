@@ -225,10 +225,10 @@ export APP_LINEIN_SOURCE ?= 0
 export WL_NSX ?= 1
 
 
-export WL_AGC ?= 0
+export WL_AGC ?= 1
 
 
-export WL_AGC_32K ?= 0
+export WL_AGC_32K ?= 1
 
 export WL_HIGH_SAMPLE ?= 1
 

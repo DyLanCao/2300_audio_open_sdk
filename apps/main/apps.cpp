@@ -1505,6 +1505,16 @@ int app_init(void)
 
 #ifdef AUDIO_LOOPBACK
 
+#ifdef WL_DEBUG_MODE
+    TRACE("nv debug mode :0x%x",nv_debug_mode_get());
+    if(nv_debug_mode_get() == NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE)
+    {
+        TRACE("****** end of test mode ****** ");
+        osDelay(10);
+        return -1;
+    }
+#endif 
+
 #ifdef APP_LINEIN_SOURCE
     extern int app_source_linein_loopback_test(bool on);
     app_source_linein_loopback_test(true);
