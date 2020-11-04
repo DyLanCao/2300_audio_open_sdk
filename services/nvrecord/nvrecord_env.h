@@ -89,9 +89,11 @@ int nv_record_env_set(struct nvrecord_env_t *nvrecord_env);
 
 void nv_record_update_ibrt_info(uint32_t newMode,bt_bdaddr_t *ibrtPeerAddr);
 
+#ifdef WL_DEBUG_MODE
 void nv_record_update_ibrt_info_debug_mode(void);
 
 uint32_t nv_debug_mode_get(void);
+#endif 
 
 #ifdef __cplusplus
 }

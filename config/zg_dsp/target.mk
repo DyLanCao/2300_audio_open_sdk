@@ -243,7 +243,7 @@ export GCC_PLAT ?= 0
 export NOTCH_FILTER ?= 0
 
 
-export WL_DEBUG_MODE ?= 1
+export WL_DEBUG_MODE ?= 0
 
 export WL_GPIO_SWITCH ?= 0
 

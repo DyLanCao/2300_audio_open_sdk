@@ -126,7 +126,7 @@ void nv_record_update_ibrt_info(uint32_t newMode,bt_bdaddr_t *ibrtPeerAddr)
         memcpy(nvrecord_env_p->ibrt_mode.record.bdAddr.address,ibrtPeerAddr->address,6);
     }
 }
-
+#ifdef WL_DEBUG_MODE
 void nv_record_update_ibrt_info_debug_mode(void)
 {
     uint32_t newMode=NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE;
@@ -147,3 +147,4 @@ uint32_t nv_debug_mode_get(void)
 {
     return  nvrecord_env_p->debug_status.status;
 }
+#endif 
