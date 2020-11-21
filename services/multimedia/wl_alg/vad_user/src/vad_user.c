@@ -30,7 +30,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+#define VAD_MIN_THD 100
+#define VAD_MAX_THD 200
+
 static pVadInst phandle = NULL;
+
 
 
 void wl_vad_init(void)
@@ -49,17 +54,50 @@ void wl_vad_init(void)
 	TRACE("vad init success :flag:%d, phandle:0x%x",flag, phandle);
 }
 
+bool vad_step_count_process(int vad_cnt)
+{
+	static uint32_t tmp_count = 0, last_count = 0;
+
+	bool vad_ret = 0;
+
+	if(vad_cnt)
+	{
+		tmp_count++;
+	}
+	else
+	{
+		tmp_count=0;
+	}
+
+	if(tmp_count < last_count)
+	{
+		TRACE("tmp_count:%d last_count:%d ",tmp_count,last_count);
+
+		if((last_count > VAD_MIN_THD) && (last_count < VAD_MAX_THD))
+		{
+			vad_ret = 1;
+		}
+	}
+	
+	last_count = tmp_count;
+
+	return vad_ret;
+}
 
 void wl_vad_process_frame(short *buffer, int len)
 {
     int vad_state = 0;
+	bool vad_value = OFF;
 
     vad_state = wl_WebRtcVad_Process(phandle, 16000, buffer, len);
 
-    if(vad_state)
+	vad_value =vad_step_count_process(vad_state);
+
+    if(vad_value)
     {
-	    TRACE("man voice detected:%d  ",vad_state);
+	    TRACE("man voice detected:%d  ",vad_value);
     }
+	
 }
 void vad_deinit()
 {

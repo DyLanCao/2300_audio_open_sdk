@@ -166,13 +166,13 @@ static void LogOfEnergy(const int16_t* data_in, size_t data_length,
   energy = (uint32_t) wl_WebRtcSpl_Energy((int16_t*) data_in, data_length,
                                        &tot_rshifts);
 
-  TRACE("aaa energy:%d total_energy:%d tot_rshifts:%d ",energy,*total_energy,tot_rshifts);
+  //TRACE("aaa energy:%d total_energy:%d tot_rshifts:%d ",energy,*total_energy,tot_rshifts);
 
   if (energy != 0) {
     // By construction, normalizing to 15 bits is equivalent with 17 leading
     // zeros of an unsigned 32 bit value.
     int normalizing_rshifts = 17 - WebRtcSpl_NormU32(energy);
-    TRACE("normalizing_rshifts:%d test:%d ",normalizing_rshifts,WebRtcSpl_NormU32(energy));
+    //TRACE("normalizing_rshifts:%d test:%d ",normalizing_rshifts,WebRtcSpl_NormU32(energy));
 
     // In a 15 bit representation the leading bit is 2^14. log2(2^14) in Q10 is
     // (14 << 10), which is what we initialize |log2_energy| with. For a more
@@ -228,7 +228,7 @@ static void LogOfEnergy(const int16_t* data_in, size_t data_length,
 
   *log_energy += offset;
 
-  TRACE("bbb energy:%d total_energy:%d tot_rshifts:%d ",energy,*total_energy,tot_rshifts);
+  //TRACE("bbb energy:%d total_energy:%d tot_rshifts:%d ",energy,*total_energy,tot_rshifts);
 
   // Update the approximate |total_energy| with the energy of |data_in|, if
   // |total_energy| has not exceeded |kMinEnergy|. |total_energy| is used as an

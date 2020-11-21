@@ -35,6 +35,11 @@ extern "C" {
 #define CRASH_DUMP_REGISTERS_NUM   17
 #define CRASH_DUMP_REGISTERS_NUM_BYTES   ((CRASH_DUMP_REGISTERS_NUM)*4)
 
+enum{
+    OFF,
+    ON,
+};
+
 /*
  * Number bytes to store from stack
  *   - this is total, not per PSP/MSP

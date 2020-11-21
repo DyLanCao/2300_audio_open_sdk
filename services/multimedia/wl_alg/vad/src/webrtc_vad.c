@@ -27,11 +27,11 @@ static const int kMaxFrameLengthMs = 30;
 #define STATIC_MEM_VAD
 #ifdef STATIC_MEM_VAD
 //sizeof(VadInstT) = 736
-//static uint8_t vad_array[740];
+static uint8_t vad_array[740];
 #endif
 
 //static unsigned char vad_static[sizeof(VadInst)];
-static unsigned char vad_static[sizeof(VadInst)];
+//static unsigned char vad_static[sizeof(VadInst)];
 
 int wl_WebRtcVad_Create(VadInst** handle)
 {
@@ -46,8 +46,8 @@ int wl_WebRtcVad_Create(VadInst** handle)
   *handle = NULL;
 
   //self = (VadInstT*)vad_static[sizeof(VadInstT)];
-  self = (VadInstT*)vad_static;
-  //self = (VadInstT*)vad_array;
+  //self = (VadInstT*)vad_static;
+  self = (VadInstT*)vad_array;
 
   *handle = (VadInst*) self;
 

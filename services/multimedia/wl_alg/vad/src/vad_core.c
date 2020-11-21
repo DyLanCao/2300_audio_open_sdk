@@ -675,7 +675,7 @@ int wl_WebRtcVad_CalcVad8khz(VadInstT* inst, const int16_t* speech_frame,
 {
     int16_t feature_vector[kNumChannels], total_power;
 
-    DUMP16("%5d,",speech_frame,30);
+    //DUMP16("%5d,",speech_frame,30);
     // Get power in the bands
     total_power = wl_WebRtcVad_CalculateFeatures(inst, speech_frame, frame_length,
                                               feature_vector);
@@ -684,7 +684,7 @@ int wl_WebRtcVad_CalcVad8khz(VadInstT* inst, const int16_t* speech_frame,
     inst->vad = GmmProbability(inst, feature_vector, total_power, frame_length);
 
 
-    TRACE("total_power:%d vad:%d ",total_power,inst->vad);
+    //TRACE("total_power:%d vad:%d ",total_power,inst->vad);
     
     return inst->vad;
 }
