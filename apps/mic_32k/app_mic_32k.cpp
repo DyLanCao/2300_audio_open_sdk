@@ -78,7 +78,8 @@
 #include "nvrecord_env.h"
 #endif
 
-#ifdef __FACTORY_MODE_SUPPORT__
+
+#ifdef MIC_32K_LOOPBACK
 
 #if SPEECH_CODEC_CAPTURE_SAMPLE == 48000    
 
@@ -101,6 +102,9 @@
 #endif
 
 #endif
+
+
+static short out_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
 
 static enum APP_AUDIO_CACHE_T a2dp_cache_status = APP_AUDIO_CACHE_QTY;
@@ -266,11 +270,7 @@ static bool app_zg_mute_mode_get(void)
 }
 #endif
 
-
-
-#if SPEECH_CODEC_CAPTURE_SAMPLE == 48000 || SPEECH_CODEC_CAPTURE_SAMPLE == 44100 || SPEECH_CODEC_CAPTURE_SAMPLE == 32000
-
-static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
+static uint32_t app_mic_32k_data_come(uint8_t *buf, uint32_t len)
 {
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
@@ -435,57 +435,14 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
         }
 #endif   
 
-#ifdef AUDIO_DEBUG
-    
-    audio_dump_clear_up();
-
-    audio_dump_add_channel_data(0, pcm_buff, pcm_len);
-
-    audio_dump_run();
-#endif
-
-#else
-
-#ifdef WL_NSX
-
-    wl_nsx_16k_denoise(pcm_buff,out_buff);
-    memset(pcm_buff,0x0,len);
-    memcpy(pcm_buff,out_buff,len);
-
-#endif
-
 #endif //high speech sample end
 
 #ifdef AUDIO_DEBUG
     
-    #if 0
-    if(dump_cnt > 0x3FF)
-    {
-        audio_dump_clear_up();
-
-        // for(uint16_t iicnt = 0; iicnt < pcm_len; iicnt++)
-        // {
-        //     pcm_buff[iicnt] = 0;
-        // }
-
-        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
-        //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
-        //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
-
-        audio_dump_run();
-
-        dump_cnt = 0x4FF;
-    }
-
-    #else
     audio_dump_clear_up();
-
     audio_dump_add_channel_data(0, pcm_buff, pcm_len);
-    //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
-    //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
-
     audio_dump_run();
-    #endif
+
 
 #endif
 
@@ -503,8 +460,9 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("high sample 32k no denoise agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("mic 32k nsx 1 agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
+
  #ifdef WL_LED_ZG_SWITCH
 
     mute_key_state = vad_step_count_process(hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin));
@@ -526,6 +484,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
         hal_gpio_pin_set_dir((enum HAL_GPIO_PIN_T)cfg_hw_pinmux_pwl[1].pin,HAL_GPIO_DIR_OUT,1);
     }
 #endif   
+
 #endif
 
     if (a2dp_cache_status == APP_AUDIO_CACHE_QTY){
@@ -534,7 +493,6 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
     return len;
 }
 
-#endif
 
 static uint32_t app_factorymode_more_data(uint8_t *buf, uint32_t len)
 {
@@ -618,19 +576,6 @@ int app_mic_32k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         wl_agc_32k_init();
         #endif
 
-#else
-
-#ifdef WL_NSX
-        app_overlay_select(APP_OVERLAY_FM);
-        uint8_t* nsx_heap;
-        app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,2, nsx_heap);
-#endif
-
-#ifdef WEBRTC_AGC
-        WebRtcAgc_init();
-#endif
-
 #endif // speech high end
  
 
@@ -668,8 +613,6 @@ int app_mic_32k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         stream_cfg.sample_rate = AUD_SAMPRATE_44100;
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000 
         stream_cfg.sample_rate = AUD_SAMPRATE_32000;
-#else
-        stream_cfg.sample_rate = AUD_SAMPRATE_16000;
 #endif
 
 #endif //end resample
@@ -693,9 +636,7 @@ int app_mic_32k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000
 
-        stream_cfg.handler = app_high_data_come;
-
-        //stream_cfg.handler = app_factorymode_data_come;
+        stream_cfg.handler = app_mic_32k_data_come;
 
 #endif
 
