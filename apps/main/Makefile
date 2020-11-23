@@ -24,6 +24,8 @@ ccflags-y +=  \
     -Iservices/resources \
     -Iservices/audio_process \
     -Iapps/apptester \
+    -Iapps/mic_16k \
+    -Iapps/mic_32k \
     -Iapps/factory \
     -Iutils/crc32 \
     -Iplatform/drivers/bt \

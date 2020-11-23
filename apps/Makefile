@@ -1,4 +1,4 @@
-obj-y := audioplayers/ common/ main/ key/ pwl/ battery/ factory/ cmd/ mic/
+obj-y := audioplayers/ common/ main/ key/ pwl/ battery/ factory/ cmd/ mic/ mic_16k/ mic_32k/
 
 ifeq ($(APP_TEST_AUDIO),1)
 obj-y += apptester/

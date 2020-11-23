@@ -148,6 +148,16 @@ extern int app_source_linein_loopback_test(bool on);
 
 #endif
 
+
+#ifdef MIC_16K_LOOPBACK
+#include "app_mic_16k.h"
+#endif
+
+
+#ifdef MIC_32K_LOOPBACK
+#include "app_mic_32k.h"
+#endif
+
 #define APP_BATTERY_LEVEL_LOWPOWERTHRESHOLD (1)
 
 #ifdef RB_CODEC
@@ -1521,6 +1531,43 @@ int app_init(void)
 #else
    app_factorymode_audioloop(true, APP_SYSFREQ_208M);
 #endif
+
+    while(1);
+#endif
+
+#ifdef MIC_16K_LOOPBACK
+
+#ifdef WL_DEBUG_MODE
+    TRACE("nv debug mode :0x%x",nv_debug_mode_get());
+    if(nv_debug_mode_get() == NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE)
+    {
+        TRACE("****** end of test mode ****** ");
+        osDelay(10);
+        return -1;
+    }
+#endif 
+
+   app_mic_16k_audioloop(true, APP_SYSFREQ_208M);
+
+
+    while(1);
+#endif
+
+
+#ifdef MIC_32K_LOOPBACK
+
+
+#ifdef WL_DEBUG_MODE
+    TRACE("nv debug mode :0x%x",nv_debug_mode_get());
+    if(nv_debug_mode_get() == NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE)
+    {
+        TRACE("****** end of test mode ****** ");
+        osDelay(10);
+        return -1;
+    }
+#endif 
+
+   app_mic_32k_audioloop(true, APP_SYSFREQ_208M);
 
     while(1);
 #endif
