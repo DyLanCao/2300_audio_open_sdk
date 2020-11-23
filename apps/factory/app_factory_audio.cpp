@@ -103,6 +103,10 @@
 
 #endif
 
+#ifdef AUDIO_HEADER
+#define HEADER_THD 50
+static uint16_t header_cnt = 0;
+#endif
 
 static enum APP_AUDIO_CACHE_T a2dp_cache_status = APP_AUDIO_CACHE_QTY;
 static int16_t *app_audioloop_play_cache = NULL;
@@ -749,14 +753,53 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
         audio_dump_clear_up();
 
 #ifdef AUDIO_HEADER
-        pcm_buff[0] = 0xabcd;    
+
+        if(header_cnt < HEADER_THD)
+        {
+            for(uint16_t icnt = 0; icnt < pcm_len; icnt++)
+            {
+                pcm_buff[icnt] = 0x1234;
+#ifdef WL_STEREO_AUDIO
+                revert_buff[icnt] = 0x1234;
 #endif
+
+            }
+
+            if(header_cnt == (HEADER_THD - 1))
+            {
+#ifdef WL_STEREO_AUDIO
+                revert_buff[pcm_len - 1] = 0xabcd;
+#else
+                pcm_buff[pcm_len - 1] = 0xabcd;
+#endif
+            }
+
+            header_cnt++;
+        }
+        else
+        {
+            /* code */
+            header_cnt = 2*HEADER_THD;
+        }
+        
+
 
         audio_dump_add_channel_data(0, pcm_buff, pcm_len);
 
 #ifdef WL_STEREO_AUDIO
         audio_dump_add_channel_data(1, revert_buff, pcm_len);
 #endif
+
+#else
+
+        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
+
+#ifdef WL_STEREO_AUDIO
+        audio_dump_add_channel_data(1, revert_buff, pcm_len);
+#endif
+
+#endif
+
         //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
         //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
         audio_dump_run();

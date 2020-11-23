@@ -238,6 +238,8 @@ export WL_VAD ?= 0
 
 export AUDIO_DEBUG ?= 1
 
+export AUDIO_HEADER ?= 1
+
 export GCC_PLAT ?= 0
 
 export NOTCH_FILTER ?= 0
