@@ -23,12 +23,11 @@
 extern "C" {
 #endif
 
+#define VAD_MODE 3
 
-void wl_vad_init(void);
+void wl_vad_init(int mode);
 
-
-void wl_vad_process_frame(short *buffer, int len);
-
+int wl_vad_process_frame(short *buffer, int len);
 
 #ifdef __cplusplus
 }

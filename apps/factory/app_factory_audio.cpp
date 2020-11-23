@@ -110,6 +110,7 @@ static int16_t *app_audioloop_play_cache = NULL;
 
 short out_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 short revert_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+short audio_uart_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
@@ -678,10 +679,28 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     }
 
 #ifdef WL_VAD
-    //memset(pcm_buff,0x0,pcm_len*2);
-    wl_vad_process_frame(pcm_buff,pcm_len);
-#endif
+    uint32_t vad_state = 0;
+    vad_state = wl_vad_process_frame(pcm_buff,pcm_len);\
 
+    if(vad_state == ON)
+    {
+	    TRACE("vad_state is:%d  ",vad_state);
+    }
+
+    #ifdef NOTCH_FILTER
+        for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
+        {
+            //pcm_buff[icnt] = -100;
+            double yout = AutoWah_process(pcm_buff[icnt]);
+            AutoWah_sweep();
+            //TRACE("oyout:%d yout:%d  ",(short)yout,yout);
+
+            pcm_buff[icnt] = (short)yout;
+        }
+    #endif //notch_filter end
+
+
+#else
 
 #ifdef NOTCH_FILTER
     //DUMP16("%5d, ",pcm_buff,30);
@@ -696,9 +715,9 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
         pcm_buff[icnt] = (short)yout;
     }
 
-
 #endif
 
+#endif
 
 #ifdef WL_NSX
 
@@ -715,35 +734,23 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
 #endif
 
+// #ifdef WL_VAD
+//     //memset(pcm_buff,0x0,pcm_len*2);
+//     wl_vad_process_frame(pcm_buff,pcm_len);
+// #endif
+
 
 #ifdef AUDIO_DEBUG
     
-    #if 0
-    if(dump_cnt > 0x3FF)
-    {
-        audio_dump_clear_up();
-
-        // for(uint16_t iicnt = 0; iicnt < pcm_len; iicnt++)
-        // {
-        //     pcm_buff[iicnt] = 0;
-        // }
-
-        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
-        //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
-        //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
-
-        audio_dump_run();
-
-        dump_cnt = 0x4FF;
-    }
-
-    #else
-
 #ifdef WL_GPIO_SWITCH
     if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin))
 #endif
     {
         audio_dump_clear_up();
+
+#ifdef AUDIO_HEADER
+        pcm_buff[0] = 0xabcd;    
+#endif
 
         audio_dump_add_channel_data(0, pcm_buff, pcm_len);
 
@@ -752,14 +759,11 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 #endif
         //audio_dump_add_channel_data(0, two_buff, pcm_len>>1);	
         //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
-
         audio_dump_run();
     }
-
-
-    #endif
-
 #endif
+
+
 
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
 
@@ -882,9 +886,8 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
  
 
 #ifdef WL_VAD
-        wl_vad_init();
+        wl_vad_init(VAD_MODE);
 #endif
-
 
         stream_cfg.bits = AUD_BITS_16;
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2  

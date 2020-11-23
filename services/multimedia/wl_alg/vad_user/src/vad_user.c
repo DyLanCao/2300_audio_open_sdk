@@ -38,7 +38,7 @@ static pVadInst phandle = NULL;
 
 
 
-void wl_vad_init(void)
+void wl_vad_init(int mode)
 {
 	int flag;
 
@@ -49,9 +49,9 @@ void wl_vad_init(void)
 	flag = wl_WebRtcVad_Init(phandle);
 	TRACE("vad aa flag:%d ",flag);
 
-	flag = wl_WebRtcVad_set_mode(phandle, 2);
+	flag = wl_WebRtcVad_set_mode(phandle, mode);
 
-	TRACE("vad init success :flag:%d, phandle:0x%x",flag, phandle);
+	TRACE("vad init success :flag:%d, mode is:%d ",flag, mode);
 }
 
 bool vad_step_count_process(int vad_cnt)
@@ -84,7 +84,7 @@ bool vad_step_count_process(int vad_cnt)
 	return vad_ret;
 }
 
-void wl_vad_process_frame(short *buffer, int len)
+int wl_vad_process_frame(short *buffer, int len)
 {
     int vad_state = 0;
 	bool vad_value = OFF;
@@ -98,6 +98,7 @@ void wl_vad_process_frame(short *buffer, int len)
 	    TRACE("man voice detected:%d  ",vad_value);
     }
 	
+	return vad_state;
 }
 void vad_deinit()
 {
