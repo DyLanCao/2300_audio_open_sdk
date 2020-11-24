@@ -104,7 +104,7 @@
 #endif
 
 #ifdef AUDIO_HEADER
-#define HEADER_THD 50
+#define HEADER_THD 100
 static uint16_t header_cnt = 0;
 #endif
 
@@ -119,10 +119,10 @@ short audio_uart_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
 
-short one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
-short two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
-void aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
+static void aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
 {
     // Copy from tail so that it works even if dst_buf == src_buf
     for (uint32_t i = 0; i < src_len>>1; i++)
@@ -130,7 +130,8 @@ void aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_
         dst_buf[i] = src_buf[i*2 + 1];
     }
 }
-void aaudio_div_stero_to_lmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
+
+static void aaudio_div_stero_to_lmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
 {
     // Copy from tail so that it works even if dst_buf == src_buf
     for (uint32_t i = 0; i < src_len>>1; i++)
@@ -748,7 +749,6 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     
 #ifdef WL_GPIO_SWITCH
     if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin))
-#endif
     {
         audio_dump_clear_up();
 
@@ -804,9 +804,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
         //audio_dump_add_channel_data(0, three_buff, pcm_len>>1);	
         audio_dump_run();
     }
+    else
+    {
+        header_cnt = 0;
+    }
 #endif
 
-
+#endif
 
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
 
@@ -833,8 +837,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 static uint32_t app_factorymode_more_data(uint8_t *buf, uint32_t len)
 {
     if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
+
+#if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
+        app_audio_pcmbuff_get((uint8_t *)buf, len);
+#else
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
         app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
+#endif
     }
     return len;
 }

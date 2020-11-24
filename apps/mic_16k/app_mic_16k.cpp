@@ -79,6 +79,7 @@
 #include "nvrecord_env.h"
 #endif
 
+
 #ifdef __FACTORY_MODE_SUPPORT__
 
 #ifdef WL_NSX_5MS
@@ -97,17 +98,25 @@ static enum APP_AUDIO_CACHE_T a2dp_cache_status = APP_AUDIO_CACHE_QTY;
 static int16_t *app_audioloop_play_cache = NULL;
 
 
-static short out_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+#ifdef WL_STEREO_AUDIO
+static short revert_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+#endif
+
+static short POSSIBLY_UNUSED out_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+
 //static short revert_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 //static short audio_uart_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
 
-short one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
-short two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short POSSIBLY_UNUSED  one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short POSSIBLY_UNUSED  two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
-void aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
+static short POSSIBLY_UNUSED left_out[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short POSSIBLY_UNUSED right_out[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+
+static void POSSIBLY_UNUSED aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
 {
     // Copy from tail so that it works even if dst_buf == src_buf
     for (uint32_t i = 0; i < src_len>>1; i++)
@@ -115,12 +124,22 @@ void aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_
         dst_buf[i] = src_buf[i*2 + 1];
     }
 }
-void aaudio_div_stero_to_lmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
+static void POSSIBLY_UNUSED aaudio_div_stero_to_lmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
 {
     // Copy from tail so that it works even if dst_buf == src_buf
     for (uint32_t i = 0; i < src_len>>1; i++)
     {
         dst_buf[i] = src_buf[i*2 + 0];
+    }
+}
+
+
+static void POSSIBLY_UNUSED audio_mono2stereo_16bits(int16_t *dst_buf, int16_t *left_buf, int16_t *right_buf, uint32_t src_len)
+{
+    uint32_t i = 0;
+    for (i = 0; i < src_len; ++i) {
+        dst_buf[i*2 + 0] = left_buf[i];
+        dst_buf[i*2 + 1] = right_buf[i];
     }
 }
 
@@ -268,6 +287,8 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     int32_t stime = 0;
     static int32_t nsx_cnt = 0;
     uint32_t pcm_len = len>>1;
+    short POSSIBLY_UNUSED *pcm_buff = (short*)buf;
+
 
     nsx_cnt++;
     //DUMP16("%d,",(short*)buf,30);
@@ -309,8 +330,10 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     //nsx denosie alg
 #ifdef WL_NSX
 
-    wl_nsx_16k_denoise(one_buff,two_buff);
-    memcpy(one_buff,two_buff,pcm_len);
+    wl_nsx_16k_denoise(one_buff,left_out);
+    //wl_nsx_16k_denoise(two_buff,right_out);
+
+    //audio_mono2stereo_16bits(pcm_buff,left_out,right_out,pcm_len>>1);
 
 #endif
 
@@ -324,11 +347,11 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 1 right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+        TRACE("mic 1ss  right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
 
-    app_audio_pcmbuff_put((uint8_t*)one_buff, pcm_len);
+    app_audio_pcmbuff_put((uint8_t*)pcm_buff, pcm_len);
 
 
 #elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 3    
@@ -542,11 +565,17 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     return len;
 }
 
-static uint32_t app_factorymode_more_data(uint8_t *buf, uint32_t len)
+static uint32_t app_mic_16k_playback_data(uint8_t *buf, uint32_t len)
 {
     if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
+#if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
+        app_audio_pcmbuff_get((uint8_t *)buf, len);
+        // app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
+        // app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
+#else
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
         app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
+#endif
     }
     return len;
 }
@@ -596,7 +625,7 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_audio_mempool_get_buff(&buff_play, BT_AUDIO_FACTORMODE_BUFF_SIZE*2);
         app_audio_mempool_get_buff((uint8_t **)&app_audioloop_play_cache, BT_AUDIO_FACTORMODE_BUFF_SIZE*2/2/2);
         app_audio_mempool_get_buff(&buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
-        app_audio_pcmbuff_init(buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
+        app_audio_pcmbuff_init(buff_loop, 32*BT_AUDIO_FACTORMODE_BUFF_SIZE);
         memset(&stream_cfg, 0, sizeof(stream_cfg));
 
 // speech nsx start
@@ -660,7 +689,7 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 
         stream_cfg.channel_num = AUD_CHANNEL_NUM_2;
         stream_cfg.io_path = AUD_OUTPUT_PATH_SPEAKER;
-        stream_cfg.handler = app_factorymode_more_data;
+        stream_cfg.handler = app_mic_16k_playback_data;
 
         stream_cfg.data_ptr = BT_AUDIO_CACHE_2_UNCACHE(buff_play);
         stream_cfg.data_size = BT_AUDIO_FACTORMODE_BUFF_SIZE*2;
