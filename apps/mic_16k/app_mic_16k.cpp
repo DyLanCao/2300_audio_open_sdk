@@ -420,7 +420,6 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     }
 
 #ifdef WL_VAD
-
     wl_vad_process_frame(pcm_buff,pcm_len);\
 
     // if(vad_state == ON)
@@ -444,8 +443,8 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 #else
 
 #ifdef NOTCH_FILTER
+s
     //DUMP16("%5d, ",pcm_buff,30);
-
     for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
     {
         //pcm_buff[icnt] = -100;
@@ -467,6 +466,7 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     memcpy(pcm_buff,out_buff,len);
 
 #ifdef WL_STEREO_AUDIO
+s
     for(uint32_t inum = 0; inum<pcm_len;inum++)
     {
         revert_buff[inum] = -pcm_buff[inum];
@@ -550,7 +550,7 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic)16k 1 agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("mic 1 16k nsx 3 agc closed speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
 #ifdef WL_GPIO_SWITCH
         TRACE("nsx_gpio_pin_value:%d ", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin));
 #endif
@@ -625,7 +625,7 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_audio_mempool_get_buff(&buff_play, BT_AUDIO_FACTORMODE_BUFF_SIZE*2);
         app_audio_mempool_get_buff((uint8_t **)&app_audioloop_play_cache, BT_AUDIO_FACTORMODE_BUFF_SIZE*2/2/2);
         app_audio_mempool_get_buff(&buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
-        app_audio_pcmbuff_init(buff_loop, 32*BT_AUDIO_FACTORMODE_BUFF_SIZE);
+        app_audio_pcmbuff_init(buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
         memset(&stream_cfg, 0, sizeof(stream_cfg));
 
 // speech nsx start
@@ -633,7 +633,7 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,2, nsx_heap);
+        wl_nsx_denoise_init(16000,3, nsx_heap);
 #endif
 
 #ifdef WEBRTC_AGC
