@@ -215,24 +215,17 @@ export DUMP_CRASH_LOG ?= 0
 
 export AUDIO_LOOPBACK ?= 1
 
-
 export OPUS_LOOPBACK ?= 0
-
 
 export APP_LINEIN_SOURCE ?= 0
 
-
 export WL_NSX ?= 1
 
-
 export WL_AGC ?= 0
-
 
 export WL_AGC_32K ?= 0
 
 export WL_HIGH_SAMPLE ?= 0
-
-
 
 export WL_VAD ?= 0
 
@@ -244,8 +237,7 @@ export GCC_PLAT ?= 0
 
 export NOTCH_FILTER ?= 0
 
-
-export WL_DEBUG_MODE ?= 1
+export WL_DEBUG_MODE ?= 0
 
 export WL_GPIO_SWITCH ?= 1
 
