@@ -400,7 +400,6 @@ static uint32_t app_mic_32k_data_come(uint8_t *buf, uint32_t len)
     nsx_cnt++;
     dump_cnt++;
 
-    //DUMP16("%d,",(short*)buf,30);
     if(false == (nsx_cnt & 0x3F))
     {
         stime = hal_sys_timer_get();
@@ -423,6 +422,7 @@ static uint32_t app_mic_32k_data_come(uint8_t *buf, uint32_t len)
 
 #elif SPEECH_CODEC_CAPTURE_SAMPLE == 32000
 
+    //DUMP16("%d,",(short*)buf,30);
 
     wl_nsx_32k_denoise_process(pcm_buff,out_buff);
 
@@ -459,7 +459,7 @@ static uint32_t app_mic_32k_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 32k nsx 1 agc 12 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("mic 32k nsx 2 agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
 
  #ifdef WL_LED_ZG_SWITCH
@@ -493,14 +493,26 @@ static uint32_t app_mic_32k_data_come(uint8_t *buf, uint32_t len)
 }
 
 
+void app_bt_stream_copy_track_one_to_stero_16bits(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
+{
+    // Copy from tail so that it works even if dst_buf == src_buf
+    for (int i = (int)(src_len - 1); i >= 0; i--)
+    {
+        dst_buf[i*2 + 0] = src_buf[i];
+        dst_buf[i*2 + 1] = -src_buf[i];
+    }
+}
+
+
 static uint32_t app_mic_32k_playback_data(uint8_t *buf, uint32_t len)
 {
     if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
+
         app_audio_pcmbuff_get((uint8_t *)buf, len);
 #else
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
-        app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
+        app_bt_stream_copy_track_one_to_stero_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
 #endif
     }
     return len;
@@ -572,7 +584,7 @@ int app_mic_32k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(32000,1, nsx_heap);
+        wl_nsx_denoise_init(32000,2, nsx_heap);
         nsx_resample_init();
 
         #ifdef WEBRTC_AGC_32K
