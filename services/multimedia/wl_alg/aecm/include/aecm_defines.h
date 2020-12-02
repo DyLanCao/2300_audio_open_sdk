@@ -14,7 +14,7 @@
 #define AECM_DYNAMIC_Q                 /* Turn on/off dynamic Q-domain. */
 
 /* Algorithm parameters */
-#define FRAME_LEN       160             /* Total frame length, 10 ms. */
+#define FRAME_LEN       80             /* Total frame length, 10 ms. */
 
 #define PART_LEN        64             /* Length of partition. */
 #define PART_LEN_SHIFT  7              /* Length of (PART_LEN * 2) in base 2. */

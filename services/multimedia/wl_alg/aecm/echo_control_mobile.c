@@ -83,17 +83,19 @@ static int WebRtcAecm_EstBufDelay(aecmob_t *aecmInst, short msInSndCardBuf);
 
 // Stuffs the farend buffer if the estimated delay is too large
 static int WebRtcAecm_DelayComp(aecmob_t *aecmInst);
-/*
-#ifdef STATIC_MEM
-unsigned char *aecm_static = NULL;
-#endif
-*/
+
 int aecm_crt =  0;
 int g_test_a = 0;
 int g_test_b = 0;
 int g_test_c = 0;
 int g_test_d = 0;
 int g_test_e = 0;
+
+#if !defined(WL_AEC)
+    #ifdef STATIC_MEM
+    static unsigned char aecm_static[704];
+    #endif
+#endif
 
 int32_t WebRtcAecm_Create(void **aecmInst)
 {
@@ -103,14 +105,20 @@ int32_t WebRtcAecm_Create(void **aecmInst)
         aecm_crt =  1;
         return -1;
     }
-/*
-#ifdef STATIC_MEM
-    aecm = (aecmob_t *)aecm_static;
-#else
-    aecm = malloc(sizeof(aecmob_t));
-#endif
-*/
+
+#if defined(WL_AEC)
     aecm = WEBRTC_MALLOC(sizeof(aecmob_t));
+#else
+
+    #ifdef STATIC_MEM
+        TRACE("aecm_buff:%d ",sizeof(aecmob_t));
+        aecm = (aecmob_t *)aecm_static;
+    #else
+        aecm = malloc(sizeof(aecmob_t));
+    #endif
+
+#endif
+
 
     *aecmInst = aecm;
     if (aecm == NULL)
@@ -178,7 +186,17 @@ int32_t WebRtcAecm_Free(void *aecmInst)
 #endif // AEC_DEBUG
     WebRtcAecm_FreeCore(aecm->aecmCore);
     WebRtc_FreeBuffer(aecm->farendBuf);
-    free(aecm);
+
+#if defined(WL_AEC)
+    speech_free(aecm);
+    aecm = NULL;
+#else
+    #ifndef STATIC_MEM
+        free(aecm);
+    #endif
+#endif
+
+
 
     return 0;
 }

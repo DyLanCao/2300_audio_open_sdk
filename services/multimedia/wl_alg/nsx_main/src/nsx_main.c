@@ -21,18 +21,20 @@
 #endif
 
 
-#if defined(WEBRTC_AGC)
+#if defined(WEBRTC_AGC) || defined(WEBRTC_AGC_32K)
 #include "agc_main.h"
 #endif
 
+enum {
+    SUCCESS = 0,
+    FAIL,
+};
 
-#if defined(WEBRTC_AECM)
+#if defined(WL_AEC)
 #include "ring_buffer.h"
 #include "echo_control_mobile.h"
 //#include "signal_processing_library.h"
 #include "hal_trace.h"
-
-
 
 
 void *aecmInst = NULL;
@@ -42,7 +44,6 @@ extern int aecm_last;
 void WebRtc_aecm_init(int nSample,int nMode)
 {
     int ret_val;
-    unsigned int count = 1;
 
 	ret_val = WebRtcAecm_Create(&aecmInst);
 	TRACE("retVal :%d aecm_crt:%d ",ret_val,aecm_crt);
@@ -55,46 +56,55 @@ void WebRtc_aecm_init(int nSample,int nMode)
 	ret_val = WebRtcAecm_set_config(aecmInst, config);
 	TRACE("retVal :%d aecm_last:%d ",ret_val,aecm_last);
 
+    if(ret_val == SUCCESS)
+    {
+        TRACE("aec init success");
+    }
+
 }
-#define  NFRAME 160
 extern int aecm_cnt;
 
-void WebRtc_aecm_process(short *near_frame, short *out_frame)
+void WebRtc_aecm_process(short *near_frame, short *out_frame,int16_t frame_size)
 {
 
     int32_t retVal = 0;
 
     /* �������� 16k ������ �����ӳ��� 5-ms  �����ӳ���2-3 ms��������� 2-8֮�����*/
-    retVal = WebRtcAecm_Process(aecmInst, near_frame, NULL, out_frame, NFRAME,2);//��������
+    retVal = WebRtcAecm_Process(aecmInst, near_frame, NULL, out_frame, frame_size,5);//��������
 
     ASSERT(retVal == 0, "WebRtc_aecm_process failed aecm_cnt:%d ",aecm_cnt);
 }
 
 
-void WebRtc_aecm_farend( const int16_t *farend, int16_t nrOfSamples)
+void WebRtc_aecm_farend( const int16_t *farend, int16_t frame_size)
 {
 
     int32_t retVal = 0;
 
     /* �������� 8k ������ �����ӳ��� 8ms */
-    retVal = WebRtcAecm_BufferFarend(aecmInst, (short*)farend, NFRAME);//�Բο�����(����)�Ĵ���
+    retVal = WebRtcAecm_BufferFarend(aecmInst, (short*)farend, frame_size);//�Բο�����(����)�Ĵ���
 
     ASSERT(retVal == 0, "WebRtcAecm_BufferFarend failed retVal:%d ",retVal);
 }
 
 
-	
+void wl_aec_exit(void)
+{
+    int32_t aec_ret = 0;
+
+    WebRtcAecm_Free(aecmInst);
+
+    ASSERT(aec_ret == 0, "wl_aec_exit failed aec_ret:%d ",aec_ret);
+
+}
 
 
 #endif
 
 #if defined(WL_NSX)
 
-#ifdef WEBRTC_AECM
-#define NSX_AUDIO_BUFFER_SIZE (1024 * 19)
-#else
 #define NSX_AUDIO_BUFFER_SIZE (1024 * 1)
-#endif
+
 
 void* state1_;
 void* state2_;
@@ -113,7 +123,7 @@ static int32_t array_3_48buff[32];//24 * sizeof(int32_t)
 //static int32_t array_i22k_buff[104];//in_22k_size, sizeof(int32_t)
 //static int32_t array_o22k_buff[88];//in_22k_size, sizeof(int32_t)
 
-
+#if 0
 static uint16_t webrtc_audio_buff[NSX_AUDIO_BUFFER_SIZE];
 
 static uint32_t nsx_buff_size_used;
@@ -147,7 +157,7 @@ int nsx_mempool_get_buff(uint16_t **buff, uint32_t size)
 
     return 0;
 }
-
+#endif
 
 pNxsHandle ppNsxHandle = NULL;
 
@@ -200,7 +210,7 @@ void nsx_resample_init(void)
     state4_48 = (void*)array_3buff;
 
 
-    nsx_mempool_init();
+    //nsx_mempool_init();
 }
 
 void wl_nsx_Alg_Process(short *shBufferIn, short *shBufferOut)
@@ -326,6 +336,11 @@ void wl_nsx_16k_denoise(short *i16k_buff, short *o16k_buff)
 #endif
 }
 
+
+void wl_nsx_exit(void)
+{
+    wl_WebRtcNsx_Free(ppNsxHandle);
+}
 #endif
 
 

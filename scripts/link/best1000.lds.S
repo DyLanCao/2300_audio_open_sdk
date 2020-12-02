@@ -60,6 +60,8 @@
 #define FLASH_NC_REGION_BASE		FLASH_C_TO_NC(FLASH_REGION_BASE)
 #define FLASHX_REGION_BASE			FLASH_TO_FLASHX(FLASH_REGION_BASE)
 
+#define RESERVED_SECTION_SIZE 0x1000
+
 #if defined(CHIP_HAS_CP) && (RAMCP_SIZE > 0)
 #define OVERLAY_FOR_CP
 #endif
@@ -277,22 +279,6 @@ SECTIONS
 	.sram_text (RAM_TO_RAMX(__sram_text_data_start__)) :
 				AT (__sram_text_data_start_flash__)
 	{
-		*:voice_opus.o(.text*)
-		/**:opus_encoder.o(.text*)*/
-		*:opus_encoder.o(.text.frame_size_select)
-		*:opus_encoder.o(.text.opus_encode_native)
-		*:opus_encoder.o(.text.user_bitrate_to_bitrate)
-		*:opus_encoder.o(.text.compute_equiv_rate)
-		*:opus_encoder.o(.text.decide_fec)
-		*:opus_encoder.o(.text.dc_reject)
-		*:opus_encoder.o(.text.gen_toc)
-		*:opus_encoder.o(.text.opus_encode)
-		*:opus_encoder.o(.text.opus_encoder_create)
-		*:opus_encoder.o(.text.opus_encoder_get_size)
-		*:opus_encoder.o(.text.opus_encoder_init)
-		*:opus_encoder.o(.text.opus_encoder_ctl)
-		*:analysis.o(.text*)
-
 		*(.sram_text*)
 		. = ALIGN(4);
 	} > RAMX
@@ -300,26 +286,6 @@ SECTIONS
 	.sram_data (RAMX_TO_RAM(ADDR(.sram_text) + SIZEOF(.sram_text))) :
 				AT (__sram_text_data_start_flash__ + SIZEOF(.sram_text))
 	{
-
-#if defined(WL_NSX)
-		*:complex_bit_reverse.o(.rodata*)
-		*:copy_set_operations.o(.rodata*)
-		*:downsample_fast.o(.rodata*)
-		*:cross_correlation.o(.rodata*)
-		*:energy.o(.rodata*)
-		*:real_fft.o(.rodata*)
-		*:min_max_operations.o(.rodata*)
-		*:spl_sqrt_floor.o(.rodata*)
-		*:complex_fft.o(.rodata*)
-		*:vector_scaling_operations.o(.rodata*)
-		*:division_operations.o(.rodata*)
-		*:get_scaling_square.o(.rodata*)
-		*:spl_init.o(.rodata*)
-		*:nsx_main.o(.rodata*)
-		*:wl_noise_suppression_x.o(.rodata*)
-		*:wl_nsx_core.o(.rodata*)
-#endif
-
 #if defined(BTUSB_AUDIO_MODE)
 		*:hal_usb.o(.rodata*)
 #endif
@@ -430,7 +396,7 @@ SECTIONS
 #ifdef VOICE_DATAPATH
 		*:opus_encoder.o(.text*)
 #else
-#if defined(__APP_WL_SMARTVOICE_OPUS_ENCODE__) && (RAM_SIZE >= 0x48000)
+#if defined(__AI_VOICE__) && (RAM_SIZE >= 0x48000)
 		*:voice_opus.o(.text*)
 		/**:opus_encoder.o(.text*)*/
 		*:opus_encoder.o(.text.frame_size_select)
@@ -531,7 +497,6 @@ SECTIONS
 #if defined(SPEECH_CS_2MIC_NS4)
 		*:speech_win.o(.text*)
 #endif
-
 		*(.fast_text_sram*)
 		. = ALIGN(4);
 		__fast_sram_text_data_end__ = .;
@@ -723,6 +688,34 @@ SECTIONS
 #endif
 
 #endif // #if !defined(SCO_OPTIMIZE_FOR_RAM)
+
+#if defined(WL_AEC) && defined(WL_TEL_DENOISE)
+			*:aecm_core_c.o(.text*)
+			*:aecm_core.o(.text*)
+			*:echo_control_mobile.o(.text*)
+			*:delay_estimator.o(.text*)
+			*:ring_buffer.o(.text*)
+			*:randomization_functions.o(.text*)
+			*:delay_estimator_wrapper.o(.text*)
+			*:ring_buffer.o(.text*)
+#endif
+
+#if defined(WL_NSX) && defined(WL_TEL_DENOISE)
+			*:nsx_main.o(.text*)
+			*:spl_sqrt_floor.o(.text*)
+			*:complex_bit_reverse.o(.text*)
+			*:cross_correlation.o(.text*)
+			*:min_max_operations.o(.text*)
+			*:division_operations.o(.text*)
+			*:copy_set_operations.o(.text*)
+			*:spl_init.o(.text*)
+			*:downsample_fast.o(.text*)
+			*:vector_scaling_operations.o(.text*)
+			*:real_fft.o(.text*)
+			*:wl_nsx_core.o(.text*)
+			*:wl_noise_suppression_x.o(.text*)
+#endif
+
 			*(.overlay_text0)
 			. = ALIGN(4);
 		}
@@ -756,28 +749,6 @@ SECTIONS
 		{
 			LONG(0);
 			*:fmdec.o(.text* .data* .rodata* .bss*)
-
-#if defined(WL_NSX)
-		*:complex_bit_reverse.o(.text*)
-		*:copy_set_operations.o(.text*)
-		*:downsample_fast.o(.text*)
-		*:cross_correlation.o(.text*)
-		*:energy.o(.text*)
-		*:real_fft.o(.text*)
-		*:min_max_operations.o(.text*)
-		*:spl_sqrt_floor.o(.text*)
-		*:complex_fft.o(.text*)
-		*:vector_scaling_operations.o(.text*)
-		*:division_operations.o(.text*)
-		*:get_scaling_square.o(.text*)
-		*:spl_init.o(.text*)
-		*:wl_nsx_core.o(.text*)
-		*:nsx_main.o(.text*)
-		*:wl_splitting_filter.o(.text*)
-		*:wl_noise_suppression_x.o(.text*)
-
-#endif
-
 			*(.overlay_text2)
 			. = ALIGN(4);
 		}
@@ -1011,6 +982,35 @@ SECTIONS
 #endif
 
 #endif // #if !defined(SCO_OPTIMIZE_FOR_RAM)
+
+
+#if defined(WL_AEC) && defined(WL_TEL_DENOISE)
+			*:aecm_core_c.o(.data* .rodata*)
+			*:aecm_core.o(.data* .rodata*)
+			*:echo_control_mobile.o(.data* .rodata*)
+			*:delay_estimator.o(.data* .rodata*)
+			*:ring_buffer.o(.data* .rodata*)
+			*:randomization_functions.o(.data* .rodata*)
+			*:delay_estimator_wrapper.o(.data* .rodata*)
+			*:ring_buffer.o(.data* .rodata*)
+#endif
+
+#if defined(WL_NSX) && defined(WL_TEL_DENOISE)
+			*:nsx_main.o(.data* .rodata*)
+			*:spl_sqrt_floor.o(.data* .rodata*)
+			*:complex_bit_reverse.o(.data* .rodata*)
+			*:cross_correlation.o(.data* .rodata*)
+			*:min_max_operations.o(.data* .rodata*)
+			*:division_operations.o(.data* .rodata*)
+			*:copy_set_operations.o(.data* .rodata*)
+			*:spl_init.o(.data* .rodata*)
+			*:downsample_fast.o(.data* .rodata*)
+			*:vector_scaling_operations.o(.data* .rodata*)
+			*:real_fft.o(.data* .rodata*)
+			*:wl_nsx_core.o(.data* .rodata*)
+			*:wl_noise_suppression_x.o(.data* .rodata*)
+#endif
+
 			*(.overlay_data0 .overlay_rodata0)
 			. = ALIGN(4);
 		}
@@ -1048,26 +1048,6 @@ SECTIONS
 		{
 			LONG(0);
 			*:fft128dot.o(.data* .rodata*)
-#if defined(WL_NSX)
-		*:complex_bit_reverse.o(.data* .rodata*)
-		*:copy_set_operations.o(.data* .rodata*)
-		*:downsample_fast.o(.data* .rodata*)
-		*:cross_correlation.o(.data* .rodata*)
-		*:energy.o(.data* .rodata*)
-		*:real_fft.o(.data* .rodata*)
-		*:min_max_operations.o(.data* .rodata*)
-		*:spl_sqrt_floor.o(.data* .rodata*)
-		*:complex_fft.o(.data* .rodata*)
-		*:vector_scaling_operations.o(.data* .rodata*)
-		*:division_operations.o(.data* .rodata*)
-		*:get_scaling_square.o(.data* .rodata*)
-		*:spl_init.o(.data* .rodata*)
-		*:wl_nsx_core.o(.data* .rodata*)
-		*:nsx_main.o(.data* .rodata*)
-		*:wl_splitting_filter.o(.data* .rodata*)
-		*:wl_noise_suppression_x.o(.data* .rodata*)
-
-#endif
 			*(.overlay_data3 .overlay_rodata3)
 			. = ALIGN(4);
 		}

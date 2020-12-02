@@ -79,6 +79,11 @@
 #include "nvrecord_env.h"
 #endif
 
+#if defined(WL_AEC)
+#include "wl_sco_process.h"
+#endif
+#include "speech_memory.h"
+
 
 #ifdef __FACTORY_MODE_SUPPORT__
 
@@ -94,6 +99,9 @@
 static uint16_t header_cnt = 0;
 #endif
 
+#define NSX_FRAME_SIZE 160
+
+
 static enum APP_AUDIO_CACHE_T a2dp_cache_status = APP_AUDIO_CACHE_QTY;
 static int16_t *app_audioloop_play_cache = NULL;
 
@@ -101,6 +109,14 @@ static int16_t *app_audioloop_play_cache = NULL;
 #ifdef WL_STEREO_AUDIO
 static short revert_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 #endif
+
+
+
+#if defined(WL_AEC)
+static short POSSIBLY_UNUSED aec_out[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short POSSIBLY_UNUSED far_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+#endif
+
 
 static short POSSIBLY_UNUSED out_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
@@ -283,7 +299,6 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 {
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
-
     int32_t stime = 0;
     static int32_t nsx_cnt = 0;
     uint32_t pcm_len = len>>1;
@@ -327,15 +342,19 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     
 #endif
 
+
+#if defined(WL_AEC)
+    WebRtc_aecm_farend(one_buff,BT_AUDIO_FACTORMODE_BUFF_SIZE>>2);
+    WebRtc_aecm_process(two_buff,aec_out,NSX_FRAME_SIZE);
+#endif
+
+
     //nsx denosie alg
 #ifdef WL_NSX
-
-    wl_nsx_16k_denoise(one_buff,left_out);
-    //wl_nsx_16k_denoise(two_buff,right_out);
-
-    //audio_mono2stereo_16bits(pcm_buff,left_out,right_out,pcm_len>>1);
-
+    wl_nsx_16k_denoise(aec_out,out_buff);
+    //memcpy(one_buff,out_buff,pcm_len);
 #endif
+
 
     //DUMP16("%5d, ",temp_buff,20);
 #ifdef AUDIO_DEBUG
@@ -351,7 +370,7 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     }
     
 
-    app_audio_pcmbuff_put((uint8_t*)pcm_buff, pcm_len);
+    app_audio_pcmbuff_put((uint8_t*)out_buff, 1*pcm_len);
 
 
 #elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 3    
@@ -443,7 +462,6 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 #else
 
 #ifdef NOTCH_FILTER
-s
     //DUMP16("%5d, ",pcm_buff,30);
     for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
     {
@@ -466,7 +484,6 @@ s
     memcpy(pcm_buff,out_buff,len);
 
 #ifdef WL_STEREO_AUDIO
-s
     for(uint32_t inum = 0; inum<pcm_len;inum++)
     {
         revert_buff[inum] = -pcm_buff[inum];
@@ -569,9 +586,9 @@ static uint32_t app_mic_16k_playback_data(uint8_t *buf, uint32_t len)
 {
     if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
-        app_audio_pcmbuff_get((uint8_t *)buf, len);
-        // app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
-        // app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
+        //app_audio_pcmbuff_get((uint8_t *)buf, len);
+        app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
+        app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
 #else
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
         app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
@@ -628,6 +645,25 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_audio_pcmbuff_init(buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
         memset(&stream_cfg, 0, sizeof(stream_cfg));
 
+
+#if defined(WL_AEC)
+        app_overlay_select(APP_OVERLAY_HFP);
+
+        uint8_t POSSIBLY_UNUSED *speech_buf = NULL;
+        int POSSIBLY_UNUSED speech_len = 0;
+        speech_len = app_audio_mempool_free_buff_size() - 1024*4;
+        app_audio_mempool_get_buff(&speech_buf, speech_len);
+        speech_heap_init(speech_buf, speech_len);
+        WebRtc_aecm_init(16000,2);
+
+#ifdef WL_NSX
+        uint8_t *nsx_heap;
+
+        nsx_heap = (uint8_t*)speech_malloc(WEBRTC_NSX_BUFF_SIZE);
+        wl_nsx_denoise_init(16000,1, nsx_heap);
+#endif
+
+#else
 // speech nsx start
 #ifdef WL_NSX
         app_overlay_select(APP_OVERLAY_FM);
@@ -643,6 +679,7 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 
 #ifdef WL_VAD
         wl_vad_init(VAD_MODE);
+#endif
 #endif
 
         stream_cfg.bits = AUD_BITS_16;

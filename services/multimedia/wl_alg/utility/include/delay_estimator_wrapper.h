@@ -16,11 +16,6 @@
 
 #include "typedefs.h"
 
-
-#ifdef STATIC_MEM
-extern unsigned char *Spectrum_size_static; //spectrum_size * sizeof(SpectrumType) = 260
-extern unsigned char *mean_far_spectrum_size_static;
-#endif
 // Releases the memory allocated by WebRtc_CreateDelayEstimatorFarend(...)
 // Input:
 //      - handle        : Pointer to the delay estimation far-end instance.

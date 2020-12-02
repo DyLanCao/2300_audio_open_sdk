@@ -16,20 +16,6 @@
 
 #include <stddef.h>  // size_t
 
-#ifdef STATIC_MEM
-extern unsigned char *aring_buff_static;
-//extern unsigned char *aring_element_static;
-extern unsigned char *bring_buff_static;
-//extern unsigned char *bring_element_static;
-extern unsigned char *cring_buff_static;
-//extern unsigned char *cring_element_static;
-
-extern unsigned char *dring_buff_static;
-//extern unsigned char *dring_element_static;
-
-extern unsigned char *ering_buff_static;
-//extern unsigned char *ering_element_static;
-#endif
 
 typedef struct RingBuffer RingBuffer;
 

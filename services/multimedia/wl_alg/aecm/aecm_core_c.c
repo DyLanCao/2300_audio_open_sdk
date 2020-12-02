@@ -22,6 +22,7 @@
 //#include "compile_assert_c.h"
 //#include "cpu_features_wrapper.h"
 #include "typedefs.h"
+#include "hal_trace.h"
 
 // Square root of Hanning window in Q14.
 #if defined(WEBRTC_DETECT_ARM_NEON) || defined(WEBRTC_ARCH_ARM_NEON)
@@ -642,6 +643,8 @@ int WebRtcAecm_ProcessBlock(AecmCore_t * aecm,
                                                                    hnl[i], 14));
     }
   }
+
+  TRACE("delays:%d nlpFlag:%d aecm->mult:%d supGain:%d ",delay, aecm->nlpFlag,aecm->mult,supGain);
 
   if (aecm->cngMode == AecmTrue)
   {

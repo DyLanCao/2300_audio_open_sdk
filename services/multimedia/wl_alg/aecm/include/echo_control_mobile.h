@@ -41,9 +41,6 @@ typedef struct {
 extern "C" {
 #endif
 
-#ifdef STATIC_MEM
-extern unsigned char *aecm_static;
-#endif
 
 /*
  * Allocates the memory needed by the AECM. The memory needs to be

@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "hal_trace.h"
+#include "memory_wrapper.h"
 
 // Number of right shifts for scaling is linearly depending on number of bits in
 // the far-end binary spectrum.
@@ -266,6 +267,15 @@ void WebRtc_FreeBinaryDelayEstimatorFarend(BinaryDelayEstimatorFarend* self) {
     return;
   }
 
+#if defined(WL_AEC)
+  WEBRTC_FREE(self->binary_far_history);
+  self->binary_far_history = NULL;
+
+  WEBRTC_FREE(self->far_bit_counts);
+  self->far_bit_counts = NULL;
+
+  WEBRTC_FREE(self);
+#else
   free(self->binary_far_history);
   self->binary_far_history = NULL;
 
@@ -273,11 +283,16 @@ void WebRtc_FreeBinaryDelayEstimatorFarend(BinaryDelayEstimatorFarend* self) {
   self->far_bit_counts = NULL;
 
   free(self);
+#endif
+
 }
+
+#if !defined(WL_AEC)
 #ifdef STATIC_MEM
 static unsigned char BinaryDelayEstimatorFarend_Size[12]; //history_size * sizeof(uint32_t):80
 static unsigned char binary_far_history[80]; //history_size * sizeof(uint32_t):80
 static unsigned char far_bit_counts[80]; //history_size * sizeof(int):80
+#endif
 #endif
 
 BinaryDelayEstimatorFarend* WebRtc_CreateBinaryDelayEstimatorFarend(
@@ -286,11 +301,15 @@ BinaryDelayEstimatorFarend* WebRtc_CreateBinaryDelayEstimatorFarend(
 
   if (history_size > 1) {
     // Sanity conditions fulfilled.
-#ifdef STATIC_MEM
-    self = (BinaryDelayEstimatorFarend*)BinaryDelayEstimatorFarend_Size;
-    ASSERT(sizeof(BinaryDelayEstimatorFarend) == 12,"sizeof(BinaryDelayEstimatorFarend) is changed = %d",sizeof(BinaryDelayEstimatorFarend));
+#if defined(WL_AEC)
+      self = WEBRTC_MALLOC(sizeof(BinaryDelayEstimatorFarend));
 #else
-    self = malloc(sizeof(BinaryDelayEstimatorFarend));
+  #ifdef STATIC_MEM
+      self = (BinaryDelayEstimatorFarend*)BinaryDelayEstimatorFarend_Size;
+      ASSERT(sizeof(BinaryDelayEstimatorFarend) == 12,"sizeof(BinaryDelayEstimatorFarend) is changed = %d",sizeof(BinaryDelayEstimatorFarend));
+  #else
+      self = malloc(sizeof(BinaryDelayEstimatorFarend));
+  #endif
 #endif
 
   }
@@ -299,21 +318,32 @@ BinaryDelayEstimatorFarend* WebRtc_CreateBinaryDelayEstimatorFarend(
 
     self->history_size = history_size;
 
-#ifdef STATIC_MEM
-    self->binary_far_history = binary_far_history;
-    ASSERT(history_size * sizeof(uint32_t) == 80,"history_size * sizeof(uint32_t) is changed = %d",history_size * sizeof(uint32_t));
+#if defined(WL_AEC)
+      self->binary_far_history = WEBRTC_MALLOC(history_size * sizeof(uint32_t));
 #else
-    // Allocate memory for history buffers.
-    self->binary_far_history = malloc(history_size * sizeof(uint32_t));
+  #ifdef STATIC_MEM
+      self->binary_far_history = (uint32_t*)binary_far_history;
+      ASSERT(history_size * sizeof(uint32_t) == 80,"history_size * sizeof(uint32_t) is changed = %d",history_size * sizeof(uint32_t));
+  #else
+      // Allocate memory for history buffers.
+      self->binary_far_history = malloc(history_size * sizeof(uint32_t));
+  #endif
 #endif
     malloc_fail |= (self->binary_far_history == NULL);
 
-#ifdef STATIC_MEM
-    self->far_bit_counts = far_bit_counts;
-    ASSERT(history_size * sizeof(int) == 80,"history_size * sizeof(int) is changed = %d",history_size * sizeof(int));
+#if defined(WL_AEC)
+
+      self->far_bit_counts = WEBRTC_MALLOC(history_size * sizeof(int));
+
 #else
-    self->far_bit_counts = malloc(history_size * sizeof(int));
+  #ifdef STATIC_MEM
+      self->far_bit_counts = (int*)far_bit_counts;
+      ASSERT(history_size * sizeof(int) == 80,"history_size * sizeof(int) is changed = %d",history_size * sizeof(int));
+  #else
+      self->far_bit_counts = malloc(history_size * sizeof(int));
+  #endif
 #endif
+
     malloc_fail |= (self->far_bit_counts == NULL);
 
     if (malloc_fail) {
@@ -348,10 +378,31 @@ void WebRtc_AddBinaryFarSpectrum(BinaryDelayEstimatorFarend* handle,
 
 void WebRtc_FreeBinaryDelayEstimator(BinaryDelayEstimator* self) {
 
-  if (self == NULL) {
+  if ((self == NULL) || (NULL == self->mean_bit_counts) || (NULL == self->bit_counts) || (NULL == self->binary_near_history) || (NULL == self->histogram) || (NULL == self->farend)) {
+    TRACE("%s is null",__func__);
     return;
   }
 
+#if defined(WL_AEC)
+  WEBRTC_FREE(self->mean_bit_counts);
+  self->mean_bit_counts = NULL;
+
+  WEBRTC_FREE(self->bit_counts);
+  self->bit_counts = NULL;
+
+  WEBRTC_FREE(self->binary_near_history);
+  self->binary_near_history = NULL;
+
+  WEBRTC_FREE(self->histogram);
+  self->histogram = NULL;
+
+  // BinaryDelayEstimator does not have ownership of |farend|, hence we do not
+  // free the memory here. That should be handled separately by the user.
+  // WEBRTC_FREE(self->farend);
+   self->farend = NULL;
+
+  // WEBRTC_FREE(self);
+#else
   free(self->mean_bit_counts);
   self->mean_bit_counts = NULL;
 
@@ -369,13 +420,17 @@ void WebRtc_FreeBinaryDelayEstimator(BinaryDelayEstimator* self) {
   self->farend = NULL;
 
   free(self);
+#endif
 }
+#if !defined(WL_AEC)
 #ifdef STATIC_MEM
 unsigned char mean_bit_counts[84];
 unsigned char bit_counts[80];
 unsigned char binary_near_history[4];
 unsigned char histogram[84];
 #endif
+#endif
+
 BinaryDelayEstimator* WebRtc_CreateBinaryDelayEstimator(
     BinaryDelayEstimatorFarend* farend, int lookahead) {
   BinaryDelayEstimator* self = NULL;
@@ -391,24 +446,46 @@ BinaryDelayEstimator* WebRtc_CreateBinaryDelayEstimator(
     self->farend = farend;
     self->near_history_size = lookahead + 1;
 
+#if defined(WL_AEC)
+    // Allocate memory for spectrum buffers.  The extra array element in
+    // |mean_bit_counts| and |histogram| is a dummy element only used while
+    // |last_delay| == -2, i.e., before we have a valid estimate.
+    self->mean_bit_counts =
+        WEBRTC_MALLOC((farend->history_size + 1) * sizeof(int32_t));
+    TRACE("(farend->history_size + 1) * sizeof(int32_t):%d ",(farend->history_size + 1) * sizeof(int32_t));
+    malloc_fail |= (self->mean_bit_counts == NULL);
+
+    self->bit_counts = WEBRTC_MALLOC(farend->history_size * sizeof(int32_t));
+    TRACE("farend->history_size * sizeof(int32_t):%d ",farend->history_size * sizeof(int32_t));
+    malloc_fail |= (self->bit_counts == NULL);
+
+    // Allocate memory for history buffers.
+    self->binary_near_history = WEBRTC_MALLOC((lookahead + 1) * sizeof(uint32_t));
+    TRACE("(lookahead + 1) * sizeof(uint32_t):%d ",(lookahead + 1) * sizeof(uint32_t));
+    malloc_fail |= (self->binary_near_history == NULL);
+
+    self->histogram = WEBRTC_MALLOC((farend->history_size + 1) * sizeof(float));
+    TRACE("(farend->history_size + 1) * sizeof(float):%d ",(farend->history_size + 1) * sizeof(float));
+    malloc_fail |= (self->histogram == NULL);
+#else
 #ifdef STATIC_MEM
     // Allocate memory for spectrum buffers.  The extra array element in
     // |mean_bit_counts| and |histogram| is a dummy element only used while
     // |last_delay| == -2, i.e., before we have a valid estimate.
-    self->mean_bit_counts = mean_bit_counts;
+    self->mean_bit_counts = (int32_t*)mean_bit_counts;
     ASSERT((farend->history_size + 1) * sizeof(int32_t) == 84,"(farend->history_size + 1) * sizeof(int32_t) is changed = %d",(farend->history_size + 1) * sizeof(int32_t));
     malloc_fail |= (self->mean_bit_counts == NULL);
 
-    self->bit_counts = bit_counts;
+    self->bit_counts = (int32_t*)bit_counts;
     ASSERT(farend->history_size * sizeof(int32_t) == 80,"farend->history_size * sizeof(int32_t) is changed = %d",farend->history_size * sizeof(int32_t));
     malloc_fail |= (self->bit_counts == NULL);
 
     // Allocate memory for history buffers.
-    self->binary_near_history = binary_near_history;
+    self->binary_near_history = (uint32_t*)binary_near_history;
     ASSERT((lookahead + 1) * sizeof(uint32_t) == 4,"(lookahead + 1) * sizeof(uint32_t) is changed = %d",(lookahead + 1) * sizeof(uint32_t));
     malloc_fail |= (self->binary_near_history == NULL);
 
-    self->histogram = histogram;
+    self->histogram = (float*)histogram;
     ASSERT((farend->history_size + 1) * sizeof(float) == 84,"(farend->history_size + 1) * sizeof(float) is changed = %d",(farend->history_size + 1) * sizeof(float));
     malloc_fail |= (self->histogram == NULL);
 #else
@@ -433,6 +510,8 @@ BinaryDelayEstimator* WebRtc_CreateBinaryDelayEstimator(
     TRACE("(farend->history_size + 1) * sizeof(float):%d ",(farend->history_size + 1) * sizeof(float));
     malloc_fail |= (self->histogram == NULL);
 #endif
+#endif
+
     if (malloc_fail) {
       WebRtc_FreeBinaryDelayEstimator(self);
       self = NULL;

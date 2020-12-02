@@ -7,11 +7,15 @@ extern "C" {
 
 #if defined(__GNUC__) && defined(__arm__)
 #include "med_memory.h"
+#include "speech_memory.h"
+
+
 #define WEBRTC_MALLOC(size) \
-    med_malloc(size)
-    
+    speech_malloc(size)
+
 #define WEBRTC_FREE(p) \
-    med_free((void*)(p))
+    speech_free((void*)(p))
+
 #else
 #include <stdlib.h>
 #define WEBRTC_MALLOC(size) \

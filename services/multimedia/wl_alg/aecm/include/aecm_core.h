@@ -31,9 +31,6 @@ typedef struct {
     int16_t imag;
 } complex16_t;
 
-#ifdef STATIC_MEM
-extern unsigned char *aecm_core_static;
-#endif
 
 typedef struct {
     int farBufWritePos;

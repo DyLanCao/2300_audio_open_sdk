@@ -134,20 +134,41 @@ void WebRtc_FreeDelayEstimatorFarend(void* handle) {
     return;
   }
 
-  free(self->mean_far_spectrum);
+#if defined(WL_AEC)
+    WEBRTC_FREE(self->mean_far_spectrum);
+#else
+
+  #ifdef STATIC_MEM
+  #else
+    free(self->mean_far_spectrum);
+  #endif
+#endif
+
   self->mean_far_spectrum = NULL;
 
   WebRtc_FreeBinaryDelayEstimatorFarend(self->binary_farend);
   self->binary_farend = NULL;
 
+#if defined(WL_AEC)
+  WEBRTC_FREE(self);
+#else
+#ifndef STATIC_MEM
   free(self);
-}
-/*
-#ifdef STATIC_MEM
-static unsigned char DelayEstimator_static[16]; //16
-unsigned char *mean_far_spectrum_size_static = NULL; //spectrum_size * sizeof(SpectrumType) = 260
 #endif
-*/
+#endif
+
+
+}
+
+#if defined(WL_AEC)
+#else
+  #ifdef STATIC_MEM
+  static unsigned char DelayEstimator_static[16]; //16
+  static unsigned char mean_far_spectrum_size_static[260]; //16
+  //unsigned char *mean_far_spectrum_size_static = NULL; //spectrum_size * sizeof(SpectrumType) = 260
+  #endif
+#endif
+
 
 void* WebRtc_CreateDelayEstimatorFarend(int spectrum_size, int history_size) {
   DelayEstimatorFarend* self = NULL;
@@ -157,15 +178,18 @@ void* WebRtc_CreateDelayEstimatorFarend(int spectrum_size, int history_size) {
   //COMPILE_ASSERT(kBandLast - kBandFirst < 32);
 
   if (spectrum_size >= kBandLast) {
-  	/*
-#ifdef STATIC_MEM
-    self = (DelayEstimatorFarend*)DelayEstimator_static;
-    ASSERT(sizeof(DelayEstimator) == 16,"sizeof(DelayEstimator) is changed = %d",sizeof(DelayEstimator));
-#else
-    self = malloc(sizeof(DelayEstimator));
-#endif
-*/
+
+#if defined(WL_AEC)
     self = WEBRTC_MALLOC(sizeof(DelayEstimator));
+#else
+  #ifdef STATIC_MEM
+      self = (DelayEstimatorFarend*)DelayEstimator_static;
+      ASSERT(sizeof(DelayEstimator) == 16,"sizeof(DelayEstimator) is changed = %d",sizeof(DelayEstimator));
+  #else
+      self = malloc(sizeof(DelayEstimator));
+  #endif
+#endif
+
   }
 
   if (self != NULL) {
@@ -174,17 +198,21 @@ void* WebRtc_CreateDelayEstimatorFarend(int spectrum_size, int history_size) {
     // Allocate memory for the binary far-end spectrum handling.
     self->binary_farend = WebRtc_CreateBinaryDelayEstimatorFarend(history_size);
     memory_fail |= (self->binary_farend == NULL);
-/*
-#ifdef STATIC_MEM
-    self->mean_far_spectrum = (SpectrumType*)mean_far_spectrum_size_static;
-    ASSERT(spectrum_size * sizeof(SpectrumType) == 260,"sizeof(DelayEstimator) is changed = %d",spectrum_size * sizeof(SpectrumType));
-#else
-    // Allocate memory for spectrum buffers.
-    self->mean_far_spectrum = malloc(spectrum_size * sizeof(SpectrumType));
-    TRACE("spectrum_size * sizeof(SpectrumType):%d ",spectrum_size * sizeof(SpectrumType));
-#endif
-*/
+
+#if defined(WL_AEC)
     self->mean_far_spectrum = WEBRTC_MALLOC(spectrum_size * sizeof(SpectrumType));
+#else
+
+  #ifdef STATIC_MEM
+      TRACE("spectrum_size * sizeof(SpectrumType):%d ",spectrum_size * sizeof(SpectrumType));
+      self->mean_far_spectrum = (SpectrumType*)mean_far_spectrum_size_static;
+      ASSERT(spectrum_size * sizeof(SpectrumType) == 260,"sizeof(DelayEstimator) is changed = %d",spectrum_size * sizeof(SpectrumType));
+  #else
+      // Allocate memory for spectrum buffers.
+      self->mean_far_spectrum = malloc(spectrum_size * sizeof(SpectrumType));
+      TRACE("spectrum_size * sizeof(SpectrumType):%d ",spectrum_size * sizeof(SpectrumType));
+  #endif
+#endif
 
 
     memory_fail |= (self->mean_far_spectrum == NULL);
@@ -280,35 +308,64 @@ void WebRtc_FreeDelayEstimator(void* handle) {
     return;
   }
 
+#if defined(WL_AEC)
+  WEBRTC_FREE(self->mean_near_spectrum);
+#else
+#ifndef STATIC_MEM
   free(self->mean_near_spectrum);
+#endif
+#endif
+
   self->mean_near_spectrum = NULL;
 
+#if defined(WL_AEC)
   WebRtc_FreeBinaryDelayEstimator(self->binary_handle);
-  self->binary_handle = NULL;
+#else
+  #ifndef STATIC_MEM
+    WebRtc_FreeBinaryDelayEstimator(self->binary_handle);
+  #endif
+#endif
 
+
+  self->binary_handle = NULL;
+  
+#if defined(WL_AEC)
+  WEBRTC_FREE(self);
+  self = NULL;
+#else
+#ifndef STATIC_MEM
   free(self);
+#endif
+#endif
+
 }
-/*
+
+#if !defined(WL_AEC)
 #ifdef STATIC_MEM
 static unsigned char DelayEstimator_far_static[16]; //16
-unsigned char *Spectrum_size_static = NULL; //spectrum_size * sizeof(SpectrumType) = 260
+static unsigned char Spectrum_size_static[260]; //spectrum_size * sizeof(SpectrumType) = 260
+//unsigned char *Spectrum_size_static = NULL; //spectrum_size * sizeof(SpectrumType) = 260
 #endif
-*/
+#endif
+
 
 void* WebRtc_CreateDelayEstimator(void* farend_handle, int lookahead) {
   DelayEstimator* self = NULL;
   DelayEstimatorFarend* farend = (DelayEstimatorFarend*) farend_handle;
 
   if (farend_handle != NULL) {
-  	/*
-#ifdef STATIC_MEM
-    self = ( DelayEstimator*)DelayEstimator_far_static;
-    ASSERT(sizeof(DelayEstimator) == 16,"sizeof(DelayEstimator) is changed = %d",sizeof(DelayEstimator));
-#else
-    self = malloc(sizeof(DelayEstimator));
-#endif
-*/
+
+#if defined(WL_AEC)
     self = WEBRTC_MALLOC(sizeof(DelayEstimator));
+#else
+  #ifdef STATIC_MEM
+      self = ( DelayEstimator*)DelayEstimator_far_static;
+      ASSERT(sizeof(DelayEstimator) == 16,"sizeof(DelayEstimator) is changed = %d",sizeof(DelayEstimator));
+  #else
+      self = malloc(sizeof(DelayEstimator));
+  #endif
+#endif
+
   }
 
   if (self != NULL) {
@@ -318,7 +375,10 @@ void* WebRtc_CreateDelayEstimator(void* farend_handle, int lookahead) {
     self->binary_handle =
         WebRtc_CreateBinaryDelayEstimator(farend->binary_farend, lookahead);
     memory_fail |= (self->binary_handle == NULL);
-/*
+
+#if defined(WL_AEC)
+    self->mean_near_spectrum = WEBRTC_MALLOC(farend->spectrum_size * sizeof(SpectrumType));
+#else
 #ifdef STATIC_MEM
     self->mean_near_spectrum = (SpectrumType*)Spectrum_size_static;
     ASSERT(farend->spectrum_size * sizeof(SpectrumType) == 260,"sizeof(DelayEstimator) and farend is changed = %d",farend->spectrum_size * sizeof(SpectrumType));
@@ -328,8 +388,7 @@ void* WebRtc_CreateDelayEstimator(void* farend_handle, int lookahead) {
                                       sizeof(SpectrumType));
     TRACE("farend->spectrum_size * sizeof(SpectrumType) sizeof:%d ",farend->spectrum_size * sizeof(SpectrumType));
 #endif
-*/
-    self->mean_near_spectrum = WEBRTC_MALLOC(farend->spectrum_size * sizeof(SpectrumType));
+#endif
     memory_fail |= (self->mean_near_spectrum == NULL);
 
     self->spectrum_size = farend->spectrum_size;

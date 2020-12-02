@@ -14,6 +14,7 @@
 
 #include "signal_processing_library.h"
 
+#include "memory_wrapper.h"
 #include "hal_trace.h"
 #include "plat_types.h"
 
@@ -22,9 +23,12 @@ struct RealFFT {
 };
 
 
-#ifdef STATIC_MEM
-unsigned char realfft_size[4] = {0};
+#if !defined(WL_AEC)
+  #ifdef STATIC_MEM
+  unsigned char realfft_size[4] = {0};
+  #endif
 #endif
+
 struct RealFFT* WebRtcSpl_CreateRealFFTC(int order) {
   struct RealFFT* self = NULL;
 
@@ -32,12 +36,18 @@ struct RealFFT* WebRtcSpl_CreateRealFFTC(int order) {
     return NULL;
   }
 
+#if defined(WL_AEC)
+  self = WEBRTC_MALLOC(sizeof(struct RealFFT));
+#else
 #ifdef STATIC_MEM
   self = (struct RealFFT*)realfft_size;
 #else
   self = malloc(sizeof(struct RealFFT));
   TRACE("sizeof(struct RealFFT):%d",sizeof(struct RealFFT));
 #endif
+
+#endif
+
   if (self == NULL) {
     return NULL;
   }
@@ -48,7 +58,13 @@ struct RealFFT* WebRtcSpl_CreateRealFFTC(int order) {
 
 void WebRtcSpl_FreeRealFFTC(struct RealFFT* self) {
   if (self != NULL) {
+#if defined(WL_AEC)
+    WEBRTC_FREE(self);
+    self = NULL;
+#else
     free(self);
+#endif
+
   }
 }
 

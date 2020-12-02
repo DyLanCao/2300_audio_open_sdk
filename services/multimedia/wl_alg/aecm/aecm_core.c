@@ -214,23 +214,31 @@ CalcLinearEnergies WebRtcAecm_CalcLinearEnergies;
 StoreAdaptiveChannel WebRtcAecm_StoreAdaptiveChannel;
 ResetAdaptiveChannel WebRtcAecm_ResetAdaptiveChannel;
 
-/*
+
+#if !defined(WL_AEC)
+
 #ifdef STATIC_MEM
-unsigned char *aecm_core_static = NULL;
+static unsigned char aecm_core_static[6504];
 #endif
-*/
+
+#endif
+
+
 
 int WebRtcAecm_CreateCore(AecmCore_t **aecmInst)
 {
-/*
+
+#if defined(WL_AEC)
+    AecmCore_t *aecm = WEBRTC_MALLOC(sizeof(AecmCore_t));
+#else
+
 #ifdef STATIC_MEM
-    AecmCore_t *aecm = (AecmCore_t *)aecm_core_static;
     TRACE("AecmCore_t size:%d ",sizeof(AecmCore_t));
+    AecmCore_t *aecm = (AecmCore_t *)aecm_core_static;
 #else
     AecmCore_t *aecm = malloc(sizeof(AecmCore_t));
 #endif
-*/
-    AecmCore_t *aecm = WEBRTC_MALLOC(sizeof(AecmCore_t));
+#endif
 
     *aecmInst = aecm;
     if (aecm == NULL)
@@ -460,7 +468,7 @@ int WebRtcAecm_InitCore(AecmCore_t * const aecm, int samplingFreq)
         return -1;
     }
     // sanity check of sampling frequency
-    aecm->mult = (int16_t)samplingFreq / 16000;
+    aecm->mult = (int16_t)samplingFreq / 8000;
 
     aecm->farBufWritePos = 0;
     aecm->farBufReadPos = 0;
@@ -604,7 +612,15 @@ int WebRtcAecm_FreeCore(AecmCore_t *aecm)
     WebRtc_FreeDelayEstimatorFarend(aecm->delay_estimator_farend);
     wl_WebRtcSpl_FreeRealFFT(aecm->real_fft);
 
-    free(aecm);
+#if defined(WL_AEC)
+    speech_free(aecm);
+    aecm = NULL;
+#else
+    #ifndef STATIC_MEM
+        free(aecm);
+    #endif
+#endif
+
 
     return 0;
 }

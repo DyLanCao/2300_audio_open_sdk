@@ -47,6 +47,7 @@ ccflags-y := \
 	-Iservices/audio_dump/include \
 	-Iservices/multimedia/speech/inc \
 	-Iservices/multimedia/rbcodec/inc \
+	-Iservices/multimedia/wl_alg/nsx_main/include \
 	-Iservices/multimedia/audio/process/eq/include \
 	-Iservices/multimedia/audio/process/resample/include \
 	-Iservices/multimedia/audio/process/filters/include \

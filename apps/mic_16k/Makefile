@@ -19,8 +19,10 @@ ccflags-y +=  \
     -Iservices/overlay \
     -Iservices/multimedia/wl_alg/nsx_main/include \
     -Iservices/multimedia/wl_alg/agc/include \
+    -Iservices/multimedia/wl_alg/utility/include \
     -Iservices/multimedia/wl_alg/notch_filter/include \
     -Iservices/multimedia/algorithm/fft/include \
+    -Iservices/multimedia/speech/inc \
     -Iapps/key \
     -Iplatform/drivers/bt \
     -Iplatform/drivers/ana \

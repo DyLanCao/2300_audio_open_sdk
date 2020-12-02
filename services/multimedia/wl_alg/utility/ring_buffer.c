@@ -70,13 +70,14 @@ static size_t GetBufferReadRegions(RingBuffer* buf,
 
   return read_elements;
 }
-/*
+
+#if !defined(WL_AEC)
 #ifdef STATIC_MEM
-unsigned char *aring_buff_static = NULL;
+static unsigned char aring_buff_static[24];
 //unsigned char *aring_element_static = NULL;
-static char aring_element_static[288];
+static char aring_element_static[448];
 #endif
-*/
+#endif
 
 RingBuffer* aWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   RingBuffer* self = NULL;
@@ -86,29 +87,31 @@ RingBuffer* aWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
 
   TRACE("sizeof(RingBuffer:%d",sizeof(RingBuffer));
 
-/*
-#ifdef STATIC_MEM
-  self = (RingBuffer*)aring_buff_static;
-#else
-  self = malloc(sizeof(RingBuffer));
-#endif
-*/
+#if defined(WL_AEC)
   self = WEBRTC_MALLOC(sizeof(RingBuffer));
+#else
+  #ifdef STATIC_MEM
+    self = (RingBuffer*)aring_buff_static;
+  #else
+    self = malloc(sizeof(RingBuffer));
+  #endif
+#endif
 
   if (!self) {
     return NULL;
   }
 
   TRACE("sizeof element:%d",element_count * element_size);
-/*
+
+#if defined(WL_AEC)
+  self->data = WEBRTC_MALLOC(element_count * element_size);
+#else
 #ifdef STATIC_MEM
   self->data = aring_element_static;
 #else
   self->data = malloc(element_count * element_size);
 #endif
-*/
-
-  self->data = WEBRTC_MALLOC(element_count * element_size);
+#endif
 
   if (!self->data) {
     free(self);
@@ -121,12 +124,14 @@ RingBuffer* aWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
 
   return self;
 }
-/*
+
+#if !defined(WL_AEC)
 #ifdef STATIC_MEM
-unsigned char *bring_buff_static = NULL;
-static char bring_element_static[288];
+static unsigned char bring_buff_static[24];
+static char bring_element_static[448];
 #endif
-*/
+#endif
+
 
 RingBuffer* bWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   RingBuffer* self = NULL;
@@ -135,30 +140,35 @@ RingBuffer* bWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   }
 
   TRACE("sizeof(RingBuffer:%d",sizeof(RingBuffer));
-/*
-#ifdef STATIC_MEM
-  self = (RingBuffer*)bring_buff_static;
-#else
-  self = malloc(sizeof(RingBuffer));
-#endif
-*/
 
+#if defined(WL_AEC)
   self = WEBRTC_MALLOC(sizeof(RingBuffer));
+#else
+  #ifdef STATIC_MEM
+    self = (RingBuffer*)bring_buff_static;
+  #else
+    self = malloc(sizeof(RingBuffer));
+  #endif
+#endif
+
 
   if (!self) {
     return NULL;
   }
 
   TRACE("sizeof element:%d",element_count * element_size);
-/*
-#ifdef STATIC_MEM
-  self->data = bring_element_static;
-#else
-  self->data = malloc(element_count * element_size);
-#endif
-*/
 
+#if defined(WL_AEC)
   self->data = WEBRTC_MALLOC(element_count * element_size);
+#else
+  #ifdef STATIC_MEM
+    self->data = bring_element_static;
+  #else
+    self->data = malloc(element_count * element_size);
+  #endif
+#endif
+
+
 
   if (!self->data) {
     free(self);
@@ -187,12 +197,12 @@ int WebRtc_InitBuffer(RingBuffer* self) {
   return 0;
 }
 
-/*
+#if !defined(WL_AEC)
 #ifdef STATIC_MEM
-unsigned char *cring_buff_static = NULL;
-static char cring_element_static[288];
+static unsigned char cring_buff_static[24];
+static char cring_element_static[448];
 #endif
-*/
+#endif
 
 RingBuffer* cWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   RingBuffer* self = NULL;
@@ -201,29 +211,34 @@ RingBuffer* cWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   }
 
   TRACE("sizeof(RingBuffer:%d",sizeof(RingBuffer));
-/*
-#ifdef STATIC_MEM
-  self = (RingBuffer*)cring_buff_static;
-#else
-  self = malloc(sizeof(RingBuffer));
-#endif
-*/
 
+#if defined(WL_AEC)
   self = WEBRTC_MALLOC(sizeof(RingBuffer));
+#else
+  #ifdef STATIC_MEM
+    self = (RingBuffer*)cring_buff_static;
+  #else
+    self = malloc(sizeof(RingBuffer));
+  #endif
+#endif
+
+
 
   if (!self) {
     return NULL;
   }
 
   TRACE("sizeof element:%d",element_count * element_size);
-/*
+
+#if defined(WL_AEC)
+  self->data = WEBRTC_MALLOC(element_count * element_size);
+#else
 #ifdef STATIC_MEM
   self->data = cring_element_static;
 #else
   self->data = malloc(element_count * element_size);
 #endif
-*/
-  self->data = WEBRTC_MALLOC(element_count * element_size);
+#endif
 
   if (!self->data) {
     free(self);
@@ -237,13 +252,13 @@ RingBuffer* cWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   return self;
 }
 
-/*
+#if !defined(WL_AEC)
 #ifdef STATIC_MEM
-unsigned char *dring_buff_static = NULL;
+static unsigned char dring_buff_static[24];
 //unsigned char *dring_element_static = NULL;
-static char dring_element_static[288];
+static char dring_element_static[448];
 #endif
-*/
+#endif
 
 RingBuffer* dWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   RingBuffer* self = NULL;
@@ -253,15 +268,16 @@ RingBuffer* dWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
 
   TRACE("sizeof(RingBuffer:%d",sizeof(RingBuffer));
 
-/*
-#ifdef STATIC_MEM
-  self = (RingBuffer*)dring_buff_static;
-#else
-  self = malloc(sizeof(RingBuffer));
-#endif
-*/
-
+#if defined(WL_AEC)
   self = WEBRTC_MALLOC(sizeof(RingBuffer));
+#else
+  #ifdef STATIC_MEM
+    self = (RingBuffer*)dring_buff_static;
+  #else
+    self = malloc(sizeof(RingBuffer));
+  #endif
+#endif
+
 
   if (!self) {
     return NULL;
@@ -269,15 +285,15 @@ RingBuffer* dWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
 
   TRACE("sizeof element:%d",element_count * element_size);
 
-/*
+#if defined(WL_AEC)
+  self->data = WEBRTC_MALLOC(element_count * element_size);
+#else
 #ifdef STATIC_MEM
   self->data = dring_element_static;
 #else
   self->data = malloc(element_count * element_size);
 #endif
-*/
-
-  self->data = WEBRTC_MALLOC(element_count * element_size);
+#endif
 
   if (!self->data) {
     free(self);
@@ -290,17 +306,20 @@ RingBuffer* dWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
 
   return self;
 }
-/*
+
+#if !defined(WL_AEC)
+
 #ifdef STATIC_MEM
 #if 0
 unsigned char *ering_buff_static = NULL;
 unsigned char *ering_element_static = NULL;
 #else
-unsigned char *ering_buff_static = NULL;
-static char ering_element_static[8000];
+static unsigned char ering_buff_static[24];
+static char ering_element_static[16000];
 #endif
 #endif
-*/
+#endif
+
 
 RingBuffer* eWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   RingBuffer* self = NULL;
@@ -309,30 +328,32 @@ RingBuffer* eWebRtc_CreateBuffer(size_t element_count, size_t element_size) {
   }
 
   TRACE("sizeof(RingBuffer:%d",sizeof(RingBuffer));
-/*
+
+#if defined(WL_AEC)
+  self = WEBRTC_MALLOC(sizeof(RingBuffer));
+#else
 #ifdef STATIC_MEM
   self = (RingBuffer*)ering_buff_static;
 #else
   self = malloc(sizeof(RingBuffer));
 #endif
-*/
-
-  self = WEBRTC_MALLOC(sizeof(RingBuffer));
+#endif
 
   if (!self) {
     return NULL;
   }
 
-  TRACE("sizeof element:%d",element_count * element_size);
-/*
+  TRACE("sizeof elemente :%d",element_count * element_size);
+#if defined(WL_AEC)
+  self->data = WEBRTC_MALLOC(element_count * element_size);
+#else
 #ifdef STATIC_MEM
   self->data = ering_element_static;
 #else
   self->data = malloc(element_count * element_size);
 #endif
-*/
+#endif
 
-  self->data = WEBRTC_MALLOC(element_count * element_size);
 
   if (!self->data) {
     free(self);
@@ -353,8 +374,15 @@ void WebRtc_FreeBuffer(void* handle) {
     return;
   }
 
+#if defined(WL_AEC)
+  WEBRTC_FREE(self->data);
+  self->data = NULL;
+  WEBRTC_FREE(self);
+  self= NULL;
+#else
   free(self->data);
   free(self);
+#endif
 }
 
 size_t WebRtc_ReadBuffer(RingBuffer* self,
