@@ -346,8 +346,6 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 #if defined(WL_AEC)
     WebRtc_aecm_farend(one_buff,BT_AUDIO_FACTORMODE_BUFF_SIZE>>2);
     WebRtc_aecm_process(two_buff,aec_out,NSX_FRAME_SIZE);
-#endif
-
 
     //nsx denosie alg
 #ifdef WL_NSX
@@ -355,6 +353,38 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     //memcpy(one_buff,out_buff,pcm_len);
 #endif
 
+#endif
+
+
+#ifdef WL_NSX
+    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+    {
+        one_buff[icnt] = pcm_buff[icnt];
+        two_buff[icnt] = pcm_buff[pcm_len/2 + icnt];
+    }
+
+    wl_nsx_16k_denoise(one_buff,left_out);
+    wl_nsx_16k_denoise(two_buff,right_out);
+
+    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+    {
+        pcm_buff[icnt] = one_buff[icnt];
+        pcm_buff[pcm_len/2 + icnt] = two_buff[icnt];
+    }
+
+#endif
+
+// #ifdef WL_NSX
+//     wl_nsx_16k_denoise(one_buff,left_out);
+//     wl_nsx_16k_denoise(two_buff,right_out);
+
+//     for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+//     {
+//         pcm_buff[2*icnt] = left_out[icnt];
+//         pcm_buff[2*icnt + 1] = right_out[icnt];
+//     }
+
+// #endif
 
     //DUMP16("%5d, ",temp_buff,20);
 #ifdef AUDIO_DEBUG
@@ -366,11 +396,14 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 1ss  right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+        TRACE("2mic 1ss  right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
-
+#if defined(WL_AEC)
     app_audio_pcmbuff_put((uint8_t*)out_buff, 1*pcm_len);
+#else
+    app_audio_pcmbuff_put((uint8_t*)pcm_buff, 2*pcm_len);
+#endif
 
 
 #elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 3    
@@ -586,9 +619,12 @@ static uint32_t app_mic_16k_playback_data(uint8_t *buf, uint32_t len)
 {
     if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
-        //app_audio_pcmbuff_get((uint8_t *)buf, len);
+        #ifdef WL_AEC
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
         app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
+        #else
+        app_audio_pcmbuff_get((uint8_t *)buf, len);
+        #endif
 #else
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
         app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
@@ -669,7 +705,7 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,3, nsx_heap);
+        wl_nsx_denoise_init(16000,2, nsx_heap);
 #endif
 
 #ifdef WEBRTC_AGC
