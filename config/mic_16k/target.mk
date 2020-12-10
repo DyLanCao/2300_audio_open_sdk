@@ -248,7 +248,7 @@ export WL_NSX_5MS ?= 0
 
 export WL_TEL_DENOISE ?= 0
 
-export WL_AEC ?= 0
+export WL_AEC ?= 1
 
 SUPPORT_BATTERY_REPORT ?= 1
 

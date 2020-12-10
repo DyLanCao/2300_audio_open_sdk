@@ -350,41 +350,26 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     //nsx denosie alg
 #ifdef WL_NSX
     wl_nsx_16k_denoise(aec_out,out_buff);
-    //memcpy(one_buff,out_buff,pcm_len);
+    memcpy(one_buff,out_buff,pcm_len);
 #endif
 
-#endif
-
+#else
 
 #ifdef WL_NSX
-    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
-    {
-        one_buff[icnt] = pcm_buff[icnt];
-        two_buff[icnt] = pcm_buff[pcm_len/2 + icnt];
-    }
-
     wl_nsx_16k_denoise(one_buff,left_out);
     wl_nsx_16k_denoise(two_buff,right_out);
 
     for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
     {
-        pcm_buff[icnt] = one_buff[icnt];
-        pcm_buff[pcm_len/2 + icnt] = two_buff[icnt];
+        pcm_buff[2*icnt] = left_out[icnt];
+        pcm_buff[2*icnt + 1] = right_out[icnt];
     }
 
 #endif
 
-// #ifdef WL_NSX
-//     wl_nsx_16k_denoise(one_buff,left_out);
-//     wl_nsx_16k_denoise(two_buff,right_out);
 
-//     for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
-//     {
-//         pcm_buff[2*icnt] = left_out[icnt];
-//         pcm_buff[2*icnt + 1] = right_out[icnt];
-//     }
+#endif //aec macro end 
 
-// #endif
 
     //DUMP16("%5d, ",temp_buff,20);
 #ifdef AUDIO_DEBUG
@@ -400,7 +385,8 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     }
     
 #if defined(WL_AEC)
-    app_audio_pcmbuff_put((uint8_t*)out_buff, 1*pcm_len);
+    app_audio_pcmbuff_put((uint8_t*)one_buff, 1*pcm_len);
+    //app_audio_pcmbuff_put((uint8_t*)pcm_buff, 2*pcm_len);
 #else
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, 2*pcm_len);
 #endif
