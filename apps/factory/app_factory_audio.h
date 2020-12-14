@@ -26,9 +26,9 @@ typedef struct {
 
 int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq);
 
+#ifdef APP_LINEIN_SOURCE
 int app_source_linein_loopback_test(bool on);
-
-
+#endif
 
 int app_factorymode_output_pcmpatten(audio_test_pcmpatten_t *pcmpatten, uint8_t *buf, uint32_t len);
 

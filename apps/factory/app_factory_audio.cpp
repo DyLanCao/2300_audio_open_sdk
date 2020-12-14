@@ -646,8 +646,8 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     //nsx denosie alg
 #ifdef WL_NSX
 
-    wl_nsx_16k_denoise(one_buff,two_buff);
-    memcpy(one_buff,two_buff,pcm_len);
+    // wl_nsx_16k_denoise(one_buff,two_buff);
+    // memcpy(one_buff,two_buff,pcm_len);
 
 #endif
 
@@ -665,7 +665,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     }
     
 
-    app_audio_pcmbuff_put((uint8_t*)one_buff, pcm_len);
+    app_audio_pcmbuff_put((uint8_t*)two_buff, pcm_len);
 
 
 #elif SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 3    
@@ -844,7 +844,7 @@ static uint32_t app_factorymode_more_data(uint8_t *buf, uint32_t len)
 {
     if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
 
-#if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
+#if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2 && !defined(LINGJI_CODEC)  
         app_audio_pcmbuff_get((uint8_t *)buf, len);
 #else
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
@@ -1038,6 +1038,203 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
     isRun=on;
     return 0;
 }
+
+
+#ifdef APP_LINEIN_SOURCE
+static short one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+
+static void aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
+{
+    // Copy from tail so that it works even if dst_buf == src_buf
+    for (uint32_t i = 0; i < src_len>>1; i++)
+    {
+        dst_buf[i] = src_buf[i*2 + 1];
+    }
+}
+
+static void aaudio_div_stero_to_lmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
+{
+    // Copy from tail so that it works even if dst_buf == src_buf
+    for (uint32_t i = 0; i < src_len>>1; i++)
+    {
+        dst_buf[i] = src_buf[i*2 + 0];
+    }
+}
+
+static uint32_t app_linein_data_come(uint8_t *buf, uint32_t len)
+{
+
+    int32_t stime = 0;
+    static int32_t nsx_cnt = 0;
+    uint32_t pcm_len = len>>1;
+
+    nsx_cnt++;
+    DUMP16("%d,",(short*)buf,30);
+    if(false == (nsx_cnt & 0x3F))
+    {
+        stime = hal_sys_timer_get();
+	    //TRACE("aecm  echo time: lens:%d  g_time_cnt:%d ",len, g_time_cnt);
+    }
+
+
+    aaudio_div_stero_to_lmono(one_buff,(int16_t*)buf,pcm_len);
+    aaudio_div_stero_to_rmono(two_buff,(int16_t*)buf,pcm_len);
+
+
+    //nsx denosie alg
+#ifdef WL_NSX
+
+    // wl_nsx_16k_denoise(one_buff,two_buff);
+    // memcpy(one_buff,two_buff,pcm_len);
+
+#endif
+
+    //DUMP16("%5d, ",temp_buff,20);
+#ifdef AUDIO_DEBUG
+    audio_dump_clear_up();
+    audio_dump_add_channel_data(0, one_buff, pcm_len>>1);
+    audio_dump_add_channel_data(1, one_buff, pcm_len>>1);	
+    audio_dump_run();
+#endif
+
+    if(false == (nsx_cnt & 0x3F))
+    {
+        TRACE("linein  speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+    }
+    
+    app_audio_pcmbuff_put((uint8_t*)buf, len);
+
+    if (a2dp_cache_status == APP_AUDIO_CACHE_QTY){
+        a2dp_cache_status = APP_AUDIO_CACHE_OK;
+    }
+    return len;
+}
+
+
+#define LINEIN_CAPTURE_CHANNEL (2)
+
+
+static uint32_t app_linein_play_more_data(uint8_t *buf, uint32_t len)
+{
+    if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
+        app_audio_pcmbuff_get((uint8_t *)buf, len);
+    }
+    return len;
+}
+
+int app_source_linein_loopback_test(bool on)
+{
+    uint8_t *buff_play = NULL;
+    uint8_t *buff_capture = NULL;
+    uint8_t *buff_loop = NULL;
+    struct AF_STREAM_CONFIG_T stream_cfg;
+    static bool isRun =  false;
+    APP_FACTORY_TRACE("app_source_linein_loopback_test work:%d op:%d freq:%d", isRun, on);
+
+    if (isRun==on)
+        return 0;
+
+    if (on){
+
+#ifdef GCC_PLAT
+        gcc_plat_init();
+#endif
+
+#ifdef NOTCH_FILTER
+        AutoWah_init(20000,16000,420,380,1,0.662,10);
+#endif
+
+        app_sysfreq_req(APP_SYSFREQ_USER_APP_0, APP_SYSFREQ_208M);
+
+        a2dp_cache_status = APP_AUDIO_CACHE_QTY;
+        app_audio_mempool_init();
+
+        app_audio_mempool_get_buff(&buff_capture, LINEIN_CAPTURE_CHANNEL*BT_AUDIO_FACTORMODE_BUFF_SIZE);
+
+        app_audio_mempool_get_buff(&buff_play, BT_AUDIO_FACTORMODE_BUFF_SIZE*2);
+        app_audio_mempool_get_buff((uint8_t **)&app_audioloop_play_cache, BT_AUDIO_FACTORMODE_BUFF_SIZE*2/2/2);
+        app_audio_mempool_get_buff(&buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
+        app_audio_pcmbuff_init(buff_loop, BT_AUDIO_FACTORMODE_BUFF_SIZE<<4);
+        memset(&stream_cfg, 0, sizeof(stream_cfg));
+
+// speech high start
+#ifdef WL_NSX
+        app_overlay_select(APP_OVERLAY_FM);
+        uint8_t* nsx_heap;
+        app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
+        wl_nsx_denoise_init(16000,2, nsx_heap);
+#endif
+
+#ifdef WEBRTC_AGC
+        WebRtcAgc_init();
+#endif
+ 
+
+#ifdef WL_VAD
+        wl_vad_init(VAD_MODE);
+#endif
+
+        stream_cfg.bits = AUD_BITS_16;
+        stream_cfg.channel_num = AUD_CHANNEL_NUM_2;
+
+#ifdef AUDIO_DEBUG
+#ifdef WL_STEREO_AUDIO
+        audio_dump_init(BT_AUDIO_FACTORMODE_BUFF_SIZE>>2, sizeof(short), 2);
+#else
+        audio_dump_init(BT_AUDIO_FACTORMODE_BUFF_SIZE>>2, sizeof(short), 1);
+#endif
+
+#endif
+
+#if defined(__AUDIO_RESAMPLE__) && defined(SW_CAPTURE_RESAMPLE)
+        stream_cfg.sample_rate = AUD_SAMPRATE_8463;
+#else
+        stream_cfg.sample_rate = AUD_SAMPRATE_16000;
+#endif //end resample
+
+
+#if FPGA==0
+        stream_cfg.device = AUD_STREAM_USE_INT_CODEC;
+#else
+        stream_cfg.device = AUD_STREAM_USE_EXT_CODEC;
+#endif
+        stream_cfg.vol = CODEC_SADC_VOL;
+        stream_cfg.io_path = AUD_INPUT_PATH_LINEIN;
+
+        stream_cfg.handler = app_linein_data_come;
+
+
+        stream_cfg.data_ptr = BT_AUDIO_CACHE_2_UNCACHE(buff_capture);
+        stream_cfg.data_size = BT_AUDIO_FACTORMODE_BUFF_SIZE*stream_cfg.channel_num;
+        af_stream_open(AUD_STREAM_ID_0, AUD_STREAM_CAPTURE, &stream_cfg);
+
+        stream_cfg.channel_num = AUD_CHANNEL_NUM_2;
+        stream_cfg.io_path = AUD_OUTPUT_PATH_SPEAKER;
+        stream_cfg.handler = app_linein_play_more_data;
+
+        stream_cfg.data_ptr = BT_AUDIO_CACHE_2_UNCACHE(buff_play);
+        stream_cfg.data_size = BT_AUDIO_FACTORMODE_BUFF_SIZE*2;
+        af_stream_open(AUD_STREAM_ID_0, AUD_STREAM_PLAYBACK, &stream_cfg);
+
+        af_stream_start(AUD_STREAM_ID_0, AUD_STREAM_PLAYBACK);
+        af_stream_start(AUD_STREAM_ID_0, AUD_STREAM_CAPTURE);
+        APP_FACTORY_TRACE("app_factorymode_audioloop on");
+    } else {
+        af_stream_stop(AUD_STREAM_ID_0, AUD_STREAM_CAPTURE);
+        af_stream_stop(AUD_STREAM_ID_0, AUD_STREAM_PLAYBACK);
+        af_stream_close(AUD_STREAM_ID_0, AUD_STREAM_CAPTURE);
+        af_stream_close(AUD_STREAM_ID_0, AUD_STREAM_PLAYBACK);
+        APP_FACTORY_TRACE("app_factorymode_audioloop off");
+
+        app_sysfreq_req(APP_SYSFREQ_USER_APP_0, APP_SYSFREQ_32K);
+    }
+
+    isRun=on;
+    return 0;
+}
+
+#endif
 
 int app_factorymode_output_pcmpatten(audio_test_pcmpatten_t *pcmpatten, uint8_t *buf, uint32_t len)
 {
