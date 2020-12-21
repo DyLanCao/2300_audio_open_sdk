@@ -79,6 +79,10 @@
 #include "nvrecord_env.h"
 #endif
 
+#ifdef WL_FIR_FILTER
+#include "wl_fir_filter.h"
+#endif
+
 #ifdef __FACTORY_MODE_SUPPORT__
 
 #if SPEECH_CODEC_CAPTURE_SAMPLE == 48000    
@@ -101,11 +105,6 @@
 #define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(320*2)
 #endif
 
-#endif
-
-#ifdef AUDIO_HEADER
-#define HEADER_THD 1000
-//static uint16_t header_cnt = 0;
 #endif
 
 static enum APP_AUDIO_CACHE_T a2dp_cache_status = APP_AUDIO_CACHE_QTY;
@@ -502,6 +501,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
 
 
+
 #ifdef WL_DEBUG_MODE
     if(nsx_cnt > 0x107AC0)
     {
@@ -515,6 +515,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
     {
         TRACE("high sample 32k no denoise agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
+    
  #ifdef WL_LED_ZG_SWITCH
 
     mute_key_state = vad_step_count_process(hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_zg_mute_switch_cfg.pin));
@@ -545,57 +546,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 }
 
 #else
-
-#ifdef AUDIO_DEBUG
-
-void dajing_data_send(int16_t *pcm_buff, int16_t *revert_buff,uint32_t pcm_len)
-{
-
-        audio_dump_clear_up();
-
-// #ifdef AUDIO_HEADER
-//         if(header_cnt < HEADER_THD)
-//         {
-//             for(uint16_t icnt = 0; icnt < pcm_len; icnt++)
-//             {
-//                 pcm_buff[icnt] = 0x1234;
-// #ifdef WL_STEREO_AUDIO
-//                 revert_buff[icnt] = 0x1234;
-// #endif
-
-//             }
-
-//             if( (HEADER_THD - 1) == header_cnt)
-//             {
-
-// #ifdef WL_STEREO_AUDIO
-//             revert_buff[pcm_len - 1] = 0xabcd;
-// #else
-//             pcm_buff[pcm_len - 1] = 0xabcd;
-// #endif
-//             }
-
-//             header_cnt++;
-//         }
-//         else
-//         {
-//             /* code */
-//             header_cnt = 2*HEADER_THD;
-//         }
-        
-
-
-        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
-#ifdef WL_STEREO_AUDIO
-        audio_dump_add_channel_data(1, revert_buff, pcm_len);
-#endif
-        audio_dump_run();
-
-//#endif
-
-
-}
-#endif
+static uint32_t nsx_num = 0;
 
 static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 {
@@ -795,14 +746,23 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 // #endif
 
 
+#ifdef WL_FIR_FILTER
+        double floatInput[pcm_len];
+        double floatOutput[pcm_len];
+        // convert to doubles
+        intToFloat(pcm_buff, floatInput, pcm_len);
+        // perform the filtering
+        firFloat(fir_coeffs, floatInput, floatOutput, pcm_len,FILTER_LEN);
+        // convert to ints
+        floatToInt(floatOutput, pcm_buff, pcm_len);
+#endif
+
 #ifdef AUDIO_DEBUG
     
 #ifdef WL_GPIO_SWITCH
     if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin))
     {
-#ifdef AUDIO_HEADER
-        dajing_data_send(pcm_buff, revert_buff,pcm_len);
-#else
+
         audio_dump_clear_up();
         audio_dump_add_channel_data(0, pcm_buff, pcm_len);
 #ifdef WL_STEREO_AUDIO
@@ -810,12 +770,13 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 #endif
         audio_dump_run();
 
-#endif
-
     }
 
+#else
+        audio_dump_clear_up();
+        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
+        audio_dump_run();
 #endif
-
 #endif
 
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
@@ -823,7 +784,8 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 1 agc 8 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        nsx_num++;
+        TRACE("mic2 nsx 2 agc 12 speed  time:%d ms and pcm_lens:%d nsx_cnt:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len, nsx_num);
 #ifdef WL_GPIO_SWITCH
         TRACE("nsx_gpio_pin_value:%d ", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin));
 #endif
@@ -945,6 +907,10 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 
 #ifdef WL_VAD
         wl_vad_init(VAD_MODE);
+#endif
+
+#ifdef WL_FIR_FILTER
+        firFloatInit();
 #endif
 
         stream_cfg.bits = AUD_BITS_16;

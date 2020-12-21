@@ -12,6 +12,7 @@ ccflags-y +=  \
     -Iservices/bt_app \
     -Iservices/nvrecord \
     -Iservices/bt_if/inc \
+    -Iservices/wl_filter \
     -Iservices/resources \
     -Iservices/audio_dump/include \
     -Iservices/multimedia/wl_alg/gcc_plat/include \

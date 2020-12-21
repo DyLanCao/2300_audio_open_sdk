@@ -21,7 +21,7 @@ extern "C" {
 
 //macro define
 #define FILTER_LEN  64
-#if 1
+#if 0
 static double fir_coeffs[ FILTER_LEN ] ={
 	 5.626776642e-01f, -3.218191161e-02f, -6.388021798e-02f,  3.956126516e-01f, -2.771835140e-01f,
 	 1.204222772e-01f, -7.925080702e-02f, -4.399817091e-02f,  1.504590958e-01f, -1.260558178e-01f,
@@ -78,7 +78,8 @@ static double fir_coeffs[ FILTER_LEN ] ={
 };
 #else
 static double fir_coeffs[FILTER_LEN] = {
-#include "coef_4ka.txt"
+//#include "coef_4ka.txt"
+#include "coef_4k_64.txt"
 };
 #endif
 
