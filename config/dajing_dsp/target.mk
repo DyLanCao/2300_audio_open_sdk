@@ -213,7 +213,7 @@ export DUMP_NORMAL_LOG ?= 0
 
 export DUMP_CRASH_LOG ?= 0
 
-export AUDIO_LOOPBACK ?= 1
+export AUDIO_LOOPBACK ?= 0
 
 export OPUS_LOOPBACK ?= 0
 
@@ -229,9 +229,7 @@ export WL_HIGH_SAMPLE ?= 0
 
 export WL_VAD ?= 0
 
-export AUDIO_DEBUG ?= 1
-
-export AUDIO_HEADER ?= 1
+export AUDIO_DEBUG ?= 0
 
 export GCC_PLAT ?= 0
 
@@ -244,6 +242,8 @@ export WL_GPIO_SWITCH ?= 1
 export WL_STEREO_AUDIO ?= 1
 
 export WL_NSX_5MS ?= 0
+
+export MIC_UART ?= 1
 
 SUPPORT_BATTERY_REPORT ?= 1
 

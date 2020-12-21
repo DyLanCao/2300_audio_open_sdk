@@ -158,6 +158,10 @@ extern int app_source_linein_loopback_test(bool on);
 #include "app_mic_32k.h"
 #endif
 
+#ifdef MIC_UART
+#include "app_mic_uart.h"
+#endif
+
 #define APP_BATTERY_LEVEL_LOWPOWERTHRESHOLD (1)
 
 #ifdef RB_CODEC
@@ -1568,6 +1572,25 @@ int app_init(void)
 #endif 
 
    app_mic_32k_audioloop(true, APP_SYSFREQ_208M);
+
+    while(1);
+#endif
+
+
+#ifdef MIC_UART
+
+
+#ifdef WL_DEBUG_MODE
+    TRACE("nv debug mode :0x%x",nv_debug_mode_get());
+    if(nv_debug_mode_get() == NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE)
+    {
+        TRACE("****** end of test mode ****** ");
+        osDelay(10);
+        return -1;
+    }
+#endif 
+
+   app_mic_uart_audioloop(true, APP_SYSFREQ_208M);
 
     while(1);
 #endif
