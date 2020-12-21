@@ -66,3 +66,9 @@ obj-y += communication/
 ifeq ($(APP_WL_SMARTVOICE),1)
 obj-y += wl_smartvoice/
 endif
+
+
+ifeq ($(WL_FIR_FILTER),1)
+obj-y += wl_filter/
+endif
+
