@@ -1028,15 +1028,19 @@ static void aaudio_div_stero_to_lmono(int16_t *dst_buf, int16_t *src_buf, uint32
     }
 }
 
+static short POSSIBLY_UNUSED left_out[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+static short POSSIBLY_UNUSED right_out[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+
 static uint32_t app_linein_data_come(uint8_t *buf, uint32_t len)
 {
 
     int32_t stime = 0;
     static int32_t nsx_cnt = 0;
     uint32_t pcm_len = len>>1;
+    short POSSIBLY_UNUSED *pcm_buff = (short*)buf;
 
     nsx_cnt++;
-    DUMP16("%d,",(short*)buf,30);
+    //DUMP16("%d,",(short*)buf,30);
     if(false == (nsx_cnt & 0x3F))
     {
         stime = hal_sys_timer_get();
@@ -1051,8 +1055,14 @@ static uint32_t app_linein_data_come(uint8_t *buf, uint32_t len)
     //nsx denosie alg
 #ifdef WL_NSX
 
-    // wl_nsx_16k_denoise(one_buff,two_buff);
-    // memcpy(one_buff,two_buff,pcm_len);
+    wl_nsx_16k_denoise(one_buff,left_out);
+    wl_nsx_16k_denoise(two_buff,right_out);
+
+    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+    {
+        pcm_buff[2*icnt] = left_out[icnt];
+        pcm_buff[2*icnt + 1] = right_out[icnt];
+    }
 
 #endif
 
@@ -1069,7 +1079,7 @@ static uint32_t app_linein_data_come(uint8_t *buf, uint32_t len)
         TRACE("linein  speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
-    app_audio_pcmbuff_put((uint8_t*)buf, len);
+    app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
 
     if (a2dp_cache_status == APP_AUDIO_CACHE_QTY){
         a2dp_cache_status = APP_AUDIO_CACHE_OK;
@@ -1129,7 +1139,7 @@ int app_source_linein_loopback_test(bool on)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,2, nsx_heap);
+        wl_nsx_denoise_init(16000,1, nsx_heap);
 #endif
 
 #ifdef WEBRTC_AGC
