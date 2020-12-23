@@ -102,8 +102,8 @@ static enum APP_AUDIO_CACHE_T a2dp_cache_status = APP_AUDIO_CACHE_QTY;
 static int16_t *app_audioloop_play_cache = NULL;
 
 
-#ifdef WL_STEREO_AUDIO
-static short revert_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+#ifdef DUMP_HEAD
+static short revert_buff[2+(BT_AUDIO_FACTORMODE_BUFF_SIZE>>1)];
 #endif
 
 
@@ -461,47 +461,36 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 	//     TRACE("vad_state is:%d  ",vad_state);
     // }
 
-    #ifdef NOTCH_FILTER
-        for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
-        {
-            //pcm_buff[icnt] = -100;
-            double yout = AutoWah_process(pcm_buff[icnt]);
-            AutoWah_sweep();
-            //TRACE("oyout:%d yout:%d  ",(short)yout,yout);
-
-            pcm_buff[icnt] = (short)yout;
-        }
-    #endif //notch_filter end
-
-
-#else
+#endif
 
 #ifdef NOTCH_FILTER
     //DUMP16("%5d, ",pcm_buff,30);
-    for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
+    for(uint16_t icnt = 0; icnt < pcm_len; icnt++)
     {
-        //pcm_buff[icnt] = -100;
-        double yout = AutoWah_process(pcm_buff[icnt]);
-        AutoWah_sweep();
-        //TRACE("oyout:%d yout:%d  ",(short)yout,yout);
 
-        pcm_buff[icnt] = (short)yout;
+        double yout = (double)notch_filter_process(pcm_buff[icnt]);
+        out_buff[icnt] = (short)yout;
+        //printf("yout:%f \n\t",yout);
+
     }
-
 #endif
 
-#endif
+
 
 #ifdef WL_NSX
 
-    wl_nsx_16k_denoise(pcm_buff,out_buff);
+    //wl_nsx_16k_denoise(pcm_buff,out_buff);
     //memset(pcm_buff,0x0,len);
-    memcpy(pcm_buff,out_buff,len);
+    //memcpy(pcm_buff,out_buff,len);
 
-#ifdef WL_STEREO_AUDIO
+#ifdef DUMP_HEAD
+    revert_buff[0] = 0xabcd;
+    revert_buff[1] = 0x140;
+
     for(uint32_t inum = 0; inum<pcm_len;inum++)
     {
-        revert_buff[inum] = -pcm_buff[inum];
+        revert_buff[2*(inum + 1)+0] = out_buff[inum];
+        revert_buff[2*(inum + 1)+1] = pcm_buff[inum];
     }
 #endif
 
@@ -516,15 +505,16 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 #ifdef AUDIO_DEBUG
     
 #ifdef WL_GPIO_SWITCH
-    if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin))
+    //if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin))
 #endif
     {
         audio_dump_clear_up();
 
-        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
 
-#ifdef WL_STEREO_AUDIO
-        audio_dump_add_channel_data(1, revert_buff, pcm_len);
+#ifdef DUMP_HEAD
+        audio_dump_add_channel_data(0, revert_buff, 2*pcm_len+2);
+#else
+        audio_dump_add_channel_data(0, pcm_buff, pcm_len);
 #endif
 	
         audio_dump_run();
@@ -533,12 +523,12 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 
 
 
-    app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
+    app_audio_pcmbuff_put((uint8_t*)out_buff, len);
 
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic_uart 16k nsx 3 agc closed speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("mic_uart 16k nsx 1 agc closed speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
 #ifdef WL_GPIO_SWITCH
         TRACE("nsx_gpio_pin_value:%d ", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin));
 #endif
@@ -595,7 +585,7 @@ int app_mic_uart_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 #endif
 
 #ifdef NOTCH_FILTER
-        AutoWah_init(20000,16000,420,380,1,0.662,10);
+        notch_filter_init();
 #endif
 
         app_sysfreq_req(APP_SYSFREQ_USER_APP_0, freq);
@@ -643,7 +633,7 @@ int app_mic_uart_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,2, nsx_heap);
+        wl_nsx_denoise_init(16000,1, nsx_heap);
 #endif
 
 #ifdef WEBRTC_AGC
@@ -654,6 +644,7 @@ int app_mic_uart_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 #ifdef WL_VAD
         wl_vad_init(VAD_MODE);
 #endif
+
 #endif
 
         stream_cfg.bits = AUD_BITS_16;
@@ -668,8 +659,8 @@ int app_mic_uart_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 #endif
 
 #ifdef AUDIO_DEBUG
-#ifdef WL_STEREO_AUDIO
-        audio_dump_init(BT_AUDIO_FACTORMODE_BUFF_SIZE>>2, sizeof(short), 2);
+#ifdef DUMP_HEAD
+        audio_dump_init(2+(BT_AUDIO_FACTORMODE_BUFF_SIZE>>1), sizeof(short), 1);
 #else
         audio_dump_init(BT_AUDIO_FACTORMODE_BUFF_SIZE>>2, sizeof(short), 1);
 #endif

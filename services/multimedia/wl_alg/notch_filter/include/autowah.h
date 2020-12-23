@@ -5,9 +5,9 @@ extern "C" {
 #ifndef __AUTOWAH_H__
 #define __AUTOWAH_H__
 
-void AutoWah_init(short effect_rate,short sampling,short maxf,short minf,short Q,float gainfactor,short freq_step);
-float AutoWah_process(int xin);
-void AutoWah_sweep(void);
+void notch_filter_init(void);
+double notch_filter_process(double data);
+void notch_filter_exit(void);
 
 #endif
 

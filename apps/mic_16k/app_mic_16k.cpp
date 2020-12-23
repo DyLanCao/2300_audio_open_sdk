@@ -461,36 +461,20 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 	//     TRACE("vad_state is:%d  ",vad_state);
     // }
 
-    #ifdef NOTCH_FILTER
-        for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
-        {
-            //pcm_buff[icnt] = -100;
-            double yout = AutoWah_process(pcm_buff[icnt]);
-            AutoWah_sweep();
-            //TRACE("oyout:%d yout:%d  ",(short)yout,yout);
-
-            pcm_buff[icnt] = (short)yout;
-        }
-    #endif //notch_filter end
-
-
-#else
+#endif
 
 #ifdef NOTCH_FILTER
     //DUMP16("%5d, ",pcm_buff,30);
-    for(uint32_t icnt = 0; icnt < pcm_len; icnt++)
+    for(uint16_t icnt = 0; icnt < pcm_len; icnt++)
     {
-        //pcm_buff[icnt] = -100;
-        double yout = AutoWah_process(pcm_buff[icnt]);
-        AutoWah_sweep();
-        //TRACE("oyout:%d yout:%d  ",(short)yout,yout);
 
+        double yout = (double)notch_filter_process(pcm_buff[icnt]);
         pcm_buff[icnt] = (short)yout;
+        //printf("yout:%f \n\t",yout);
     }
 
 #endif
 
-#endif
 
 #ifdef WL_NSX
 
@@ -595,7 +579,7 @@ int app_mic_16k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 #endif
 
 #ifdef NOTCH_FILTER
-        AutoWah_init(20000,16000,420,380,1,0.662,10);
+        notch_filter_init();
 #endif
 
         app_sysfreq_req(APP_SYSFREQ_USER_APP_0, freq);
