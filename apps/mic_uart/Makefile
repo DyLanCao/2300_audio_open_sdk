@@ -11,6 +11,7 @@ ccflags-y +=  \
     -Iutils/hwtimer_list \
     -Iservices/bt_app \
     -Iservices/nvrecord \
+    -Iservices/wl_filter \
     -Iservices/bt_if/inc \
     -Iservices/resources \
     -Iservices/audio_dump/include \

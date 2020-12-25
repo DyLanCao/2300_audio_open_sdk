@@ -82,7 +82,7 @@ uint32_t gcc_plat_process(short *left_input,short *right_input, uint32_t frame_l
 
     }
 
-    TRACE("gcc_gain:%d ",gcc_gain);
+    //TRACE("gcc_gain:%d ",gcc_gain);
 
     return gcc_gain;
 }

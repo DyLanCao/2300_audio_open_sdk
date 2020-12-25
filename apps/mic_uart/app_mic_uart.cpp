@@ -85,6 +85,10 @@
 #include "speech_memory.h"
 
 
+#ifdef WL_FIR_FILTER
+#include "wl_fir_filter.h"
+#endif
+
 #ifdef __FACTORY_MODE_SUPPORT__
 
 #ifdef WL_NSX_5MS
@@ -469,12 +473,29 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
     {
 
         double yout = (double)notch_filter_process(pcm_buff[icnt]);
+        //yout = (double)notch_filter_process_sec(yout);
+        yout = (double)notch_filter_process_thr(yout);
+        //yout = (double)notch_filter_process_four(yout);
+        yout = (double)notch_filter_process_five(yout);
+        //yout = (double)notch_filter_process_six(yout);
         out_buff[icnt] = (short)yout;
         //printf("yout:%f \n\t",yout);
 
     }
 #endif
 
+
+
+#ifdef WL_FIR_FILTER
+        double floatInput[pcm_len];
+        double floatOutput[pcm_len];
+        // convert to doubles
+        intToFloat(out_buff, floatInput, pcm_len);
+        // perform the filtering
+        firFloat(fir_coeffs, floatInput, floatOutput, pcm_len,FILTER_LEN);
+        // convert to ints
+        floatToInt(floatOutput, out_buff, pcm_len);
+#endif
 
 
 #ifdef WL_NSX
@@ -588,6 +609,9 @@ int app_mic_uart_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         notch_filter_init();
 #endif
 
+#ifdef WL_FIR_FILTER
+        firFloatInit();
+#endif
         app_sysfreq_req(APP_SYSFREQ_USER_APP_0, freq);
 
         a2dp_cache_status = APP_AUDIO_CACHE_QTY;

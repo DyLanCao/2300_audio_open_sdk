@@ -546,7 +546,7 @@ static uint32_t app_high_data_come(uint8_t *buf, uint32_t len)
 }
 
 #else
-static uint32_t nsx_num = 0;
+//static uint32_t nsx_num = 0;
 
 static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 {
@@ -569,17 +569,18 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     aaudio_div_stero_to_lmono(one_buff,(int16_t*)buf,pcm_len);
     aaudio_div_stero_to_rmono(two_buff,(int16_t*)buf,pcm_len);
 
+
 #ifdef GCC_PLAT
 
     static uint32_t gcc_plat_count = 0;
 
     if(gcc_plat_count > GCC_PLAT_START_THD)
     {
-        uint32_t gcc_gain = gcc_plat_process(one_buff,two_buff,pcm_len>>1);
+        uint32_t gcc_gain = gcc_plat_process(two_buff,one_buff,pcm_len>>1);
 
         for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
         {
-            one_buff[icnt] = one_buff[icnt]>>gcc_gain;
+            two_buff[icnt] = two_buff[icnt]>>gcc_gain;
         }
     }
     else
@@ -597,12 +598,12 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
     //nsx denosie alg
 #ifdef WL_NSX
 
-    // wl_nsx_16k_denoise(one_buff,two_buff);
-    // memcpy(one_buff,two_buff,pcm_len);
-
+    wl_nsx_16k_denoise(one_buff,two_buff);
+    //memcpy(one_buff,two_buff,pcm_len);
 #endif
 
-    //DUMP16("%5d, ",temp_buff,20);
+    DUMP16("%5d, ",two_buff,20);
+
 #ifdef AUDIO_DEBUG
     audio_dump_clear_up();
     audio_dump_add_channel_data(0, one_buff, pcm_len>>1);
@@ -612,7 +613,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 1 right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+        TRACE("stero two mic2 right agc 14 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
 
