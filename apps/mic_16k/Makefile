@@ -10,6 +10,7 @@ ccflags-y +=  \
     -Iutils/intersyshci \
     -Iutils/hwtimer_list \
     -Iservices/bt_app \
+    -Iservices/multimedia/wl_alg/gcc_plat/include \
     -Iservices/nvrecord \
     -Iservices/bt_if/inc \
     -Iservices/resources \

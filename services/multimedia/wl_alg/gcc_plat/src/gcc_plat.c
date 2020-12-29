@@ -87,6 +87,38 @@ uint32_t gcc_plat_process(short *left_input,short *right_input, uint32_t frame_l
     return gcc_gain;
 }
 
+
+uint32_t gcc_plat_get(short *left_input,short *right_input, uint32_t frame_len)
+{
+    uint32_t left_amount = 0, right_amount = 0,left_avg = 0,right_avg = 0,compare_value = 0;
+    for(int icnt = 0; icnt < frame_len; icnt++)
+    {
+            left_amount += ABS(left_input[icnt]);
+            right_amount += ABS(right_input[icnt]);
+    }
+
+    if(frame_len == 0 || right_amount == 0)
+    {
+        TRACE("frame_len:%d right_amount:%d  exit ",frame_len,right_amount);
+        return 1;
+    }
+
+    left_avg = left_amount/frame_len;
+    right_avg = right_amount/frame_len;
+
+    compare_value = left_avg*1000/right_avg;
+
+    avg_compare_val = (8*avg_compare_val/10 + 2*compare_value/10);
+
+    TRACE("plat_get left_avg:%d right_avg:%d compare_value:%d avg_compare_val:%d ",left_avg,right_avg,compare_value,avg_compare_val);
+
+
+    //TRACE("gcc_gain:%d ",gcc_gain);
+
+    return avg_compare_val;
+}
+
+
 void gcc_plat_exit(void)
 {
 

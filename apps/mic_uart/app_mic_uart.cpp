@@ -437,7 +437,7 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 
 #else
 
-    short *pcm_buff = (short*)buf;
+    short POSSIBLY_UNUSED *pcm_buff = (short*)buf;
 
     //DUMP16("%5d, ",pcm_buff,30);
 

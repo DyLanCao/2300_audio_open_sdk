@@ -22,6 +22,8 @@ void gcc_plat_init(void);
 //void gcc_plat_process(short *left_input,short *right_input, uint32_t frame_len);
 int32_t gcc_plat_process(short *left_input,short *right_input, uint32_t frame_len);
 
+uint32_t gcc_plat_get(short *left_input,short *right_input, uint32_t frame_len);
+
 void gcc_plat_exit(void);
 
 #endif

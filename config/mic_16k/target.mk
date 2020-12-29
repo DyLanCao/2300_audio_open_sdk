@@ -236,7 +236,7 @@ export WL_VAD ?= 0
 
 export AUDIO_DEBUG ?= 0
 
-export GCC_PLAT ?= 0
+export GCC_PLAT ?= 1
 
 export NOTCH_FILTER ?= 0
 
@@ -246,9 +246,13 @@ export WL_GPIO_SWITCH ?= 0
 
 export WL_NSX_5MS ?= 0
 
+# aec process work on it
 export WL_TEL_DENOISE ?= 0
 
-export WL_AEC ?= 1
+export WL_AEC ?= 0
+
+export STEREO_MIC ?= 1
+
 
 SUPPORT_BATTERY_REPORT ?= 1
 

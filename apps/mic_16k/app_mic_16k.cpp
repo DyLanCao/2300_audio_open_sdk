@@ -56,7 +56,9 @@
 #include "gcc_plat.h"
 
 #define GCC_PLAT_START_THD 200
+
 #endif
+
 
 #ifdef AUDIO_DEBUG
 #include "audio_dump.h"
@@ -315,6 +317,20 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 
 #ifdef GCC_PLAT
 
+
+#ifdef STEREO_MIC
+
+        uint32_t plat_val = gcc_plat_get(two_buff,one_buff,pcm_len>>1);
+
+        if(plat_val > 1000)
+        {   
+            for(uint32_t inum = 0; inum < pcm_len>>1; inum++)
+            {
+                one_buff[inum] = two_buff[inum];
+            }  
+        }
+
+#else
     static uint32_t gcc_plat_count = 0;
 
     if(gcc_plat_count > GCC_PLAT_START_THD)
@@ -330,13 +346,12 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     {
         /* code */
         gcc_plat_count++;
-        // for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
-        // {
-        //     one_buff[icnt] = 0;
-        // }
     }
-    
+
 #endif
+#endif
+
+
 
 
 #if defined(WL_AEC)
@@ -353,13 +368,6 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
 
 #ifdef WL_NSX
     wl_nsx_16k_denoise(one_buff,left_out);
-    wl_nsx_16k_denoise(two_buff,right_out);
-
-    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
-    {
-        pcm_buff[2*icnt] = left_out[icnt];
-        pcm_buff[2*icnt + 1] = right_out[icnt];
-    }
 
 #endif
 
@@ -382,7 +390,8 @@ static uint32_t app_mic_16k_data_come(uint8_t *buf, uint32_t len)
     
 #if defined(WL_AEC)
     app_audio_pcmbuff_put((uint8_t*)one_buff, 1*pcm_len);
-    //app_audio_pcmbuff_put((uint8_t*)pcm_buff, 2*pcm_len);
+#elif defined(STEREO_MIC)
+    app_audio_pcmbuff_put((uint8_t*)left_out, 1*pcm_len);
 #else
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, 2*pcm_len);
 #endif
@@ -541,7 +550,7 @@ static uint32_t app_mic_16k_playback_data(uint8_t *buf, uint32_t len)
 {
     if (a2dp_cache_status != APP_AUDIO_CACHE_QTY){
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
-        #ifdef WL_AEC
+        #if defined(WL_AEC) || defined(STEREO_MIC)
         app_audio_pcmbuff_get((uint8_t *)app_audioloop_play_cache, len/2);
         app_bt_stream_copy_track_one_to_two_16bits((int16_t *)buf, app_audioloop_play_cache, len/2/2);
         #else

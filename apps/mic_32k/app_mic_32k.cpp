@@ -459,7 +459,7 @@ static uint32_t app_mic_32k_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("mic 32k nsx 2 agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
+        TRACE("mic 32k nsx 3 agc 15 speed  time:%d ms and pcm_lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len,hal_sysfreq_get());
     }
 
  #ifdef WL_LED_ZG_SWITCH
@@ -584,7 +584,7 @@ int app_mic_32k_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(32000,2, nsx_heap);
+        wl_nsx_denoise_init(32000,3, nsx_heap);
         nsx_resample_init();
 
         #ifdef WEBRTC_AGC_32K

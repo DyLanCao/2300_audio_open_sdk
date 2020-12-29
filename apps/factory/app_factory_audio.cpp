@@ -991,26 +991,6 @@ int app_factorymode_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
 
 
 #ifdef APP_LINEIN_SOURCE
-static short one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
-static short two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
-
-static void aaudio_div_stero_to_rmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
-{
-    // Copy from tail so that it works even if dst_buf == src_buf
-    for (uint32_t i = 0; i < src_len>>1; i++)
-    {
-        dst_buf[i] = src_buf[i*2 + 1];
-    }
-}
-
-static void aaudio_div_stero_to_lmono(int16_t *dst_buf, int16_t *src_buf, uint32_t src_len)
-{
-    // Copy from tail so that it works even if dst_buf == src_buf
-    for (uint32_t i = 0; i < src_len>>1; i++)
-    {
-        dst_buf[i] = src_buf[i*2 + 0];
-    }
-}
 
 static short POSSIBLY_UNUSED left_out[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 static short POSSIBLY_UNUSED right_out[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
@@ -1039,15 +1019,20 @@ static uint32_t app_linein_data_come(uint8_t *buf, uint32_t len)
     //nsx denosie alg
 #ifdef WL_NSX
 
+    for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
+    {
+        one_buff[icnt] = pcm_buff[icnt];
+        two_buff[icnt] = pcm_buff[pcm_len/2 + icnt];
+    }
+
     wl_nsx_16k_denoise(one_buff,left_out);
     wl_nsx_16k_denoise(two_buff,right_out);
 
     for(uint32_t icnt = 0; icnt < pcm_len>>1; icnt++)
     {
-        pcm_buff[2*icnt] = left_out[icnt];
-        pcm_buff[2*icnt + 1] = right_out[icnt];
+        pcm_buff[icnt] = left_out[icnt];
+        pcm_buff[pcm_len/2 + icnt] = right_out[icnt];
     }
-
 #endif
 
     //DUMP16("%5d, ",temp_buff,20);
@@ -1060,7 +1045,7 @@ static uint32_t app_linein_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        TRACE("linein  speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
+        TRACE("linein nsx 1 agc 10 speed  time:%d ms and lens:%d freq:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), len,hal_sysfreq_get());
     }
     
     app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
@@ -1123,7 +1108,7 @@ int app_source_linein_loopback_test(bool on)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,1, nsx_heap);
+        wl_nsx_denoise_init(16000,2, nsx_heap);
 #endif
 
 #ifdef WEBRTC_AGC
