@@ -458,6 +458,7 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
     }
 
 #ifdef WL_VAD
+
     wl_vad_process_frame(pcm_buff,pcm_len);\
 
     // if(vad_state == ON)
@@ -500,9 +501,9 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 
 #ifdef WL_NSX
 
-    //wl_nsx_16k_denoise(pcm_buff,out_buff);
-    //memset(pcm_buff,0x0,len);
-    //memcpy(pcm_buff,out_buff,len);
+    wl_nsx_16k_denoise(pcm_buff,out_buff);
+    memset(pcm_buff,0x0,len);
+    memcpy(pcm_buff,out_buff,len);
 
 #ifdef DUMP_HEAD
     revert_buff[0] = 0xabcd;
@@ -510,8 +511,8 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 
     for(uint32_t inum = 0; inum<pcm_len;inum++)
     {
-        revert_buff[2*(inum + 1)+0] = out_buff[inum];
-        revert_buff[2*(inum + 1)+1] = pcm_buff[inum];
+        revert_buff[2*(inum + 1)+0] = pcm_buff[inum];
+        revert_buff[2*(inum + 1)+1] = -pcm_buff[inum];
     }
 #endif
 
@@ -526,7 +527,7 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 #ifdef AUDIO_DEBUG
     
 #ifdef WL_GPIO_SWITCH
-    //if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin))
+    if(0 == hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin))
 #endif
     {
         audio_dump_clear_up();

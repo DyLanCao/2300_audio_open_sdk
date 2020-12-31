@@ -768,8 +768,7 @@ static uint32_t app_factorymode_data_come(uint8_t *buf, uint32_t len)
 
     if(false == (nsx_cnt & 0x3F))
     {
-        nsx_num++;
-        TRACE("mic2 nsx 2 agc 12 speed  time:%d ms and pcm_lens:%d nsx_cnt:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len, nsx_num);
+        TRACE("mic2 nsx 2 agc 12 speed  time:%d ms and pcm_lens:%d ", TICKS_TO_MS(hal_sys_timer_get() - stime), pcm_len);
 #ifdef WL_GPIO_SWITCH
         TRACE("nsx_gpio_pin_value:%d ", hal_gpio_pin_get_val((enum HAL_GPIO_PIN_T)app_wl_nsx_switch_detecter_cfg.pin));
 #endif
