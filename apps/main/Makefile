@@ -27,6 +27,7 @@ ccflags-y +=  \
     -Iapps/mic_uart \
     -Iapps/mic_16k \
     -Iapps/mic_32k \
+    -Iapps/dual_mic_nsx \
     -Iapps/factory \
     -Iutils/crc32 \
     -Iplatform/drivers/bt \

@@ -658,7 +658,7 @@ int app_mic_uart_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         app_overlay_select(APP_OVERLAY_FM);
         uint8_t* nsx_heap;
         app_audio_mempool_get_buff(&nsx_heap, WEBRTC_NSX_BUFF_SIZE);
-        wl_nsx_denoise_init(16000,1, nsx_heap);
+        wl_nsx_denoise_init(16000,2, nsx_heap);
 #endif
 
 #ifdef WEBRTC_AGC
