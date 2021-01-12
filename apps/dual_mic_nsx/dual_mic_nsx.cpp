@@ -87,7 +87,13 @@
 
 #ifdef DUAL_MIC_NSX
 
-#define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(320*2)
+#include "gcc_phat_fixed.h"
+
+#include "data.h"
+#define NUM_CHANNEL 2
+
+
+#define BT_AUDIO_FACTORMODE_BUFF_SIZE    	(1024*2)
 
 
 
@@ -144,6 +150,24 @@ static void POSSIBLY_UNUSED audio_mono2stereo_16bits(int16_t *dst_buf, int16_t *
     }
 }
 
+#endif
+
+
+static void DelaySequence(float *in_data, int num, int delay, float *out_data) {
+    for (int i = 0; i < num; i++) {
+        if (i - delay >= 0 && i - delay < num) {
+            out_data[i] = in_data[i - delay];
+        }
+        else {
+            out_data[i] = 0;
+        }
+    }   
+}
+
+#ifdef GCC_PHAT_FIXED
+float delay_data1[NUM_DATA];
+float delay_data2[NUM_DATA];
+float all_data[NUM_DATA*NUM_CHANNEL];
 #endif
 
 
@@ -206,8 +230,39 @@ static uint32_t dual_mic_nsx_data_come(uint8_t *buf, uint32_t len)
 #endif
 
 
+#ifdef GCC_PHAT_FIXED
+    static int ret = 0;
+    DelaySequence(g_data, NUM_DATA, -50, delay_data1);
+    DelaySequence(g_data, NUM_DATA, -5, delay_data2);
+    
+    // memcpy(all_data, g_data, sizeof(double) * NUM_DATA);
+    for (int icnt = 0; icnt < NUM_DATA; icnt++)
+    {
+        /* code */
+        all_data[icnt] = g_data[icnt];
+        all_data[NUM_DATA+icnt] = delay_data1[icnt];
+
+    }
+    
+    // memcpy(all_data + NUM_DATA, delay_data1, sizeof(double) * NUM_DATA);
+    //memcpy(all_data + 2 * NUM_DATA, delay_data2, sizeof(double) * NUM_DATA);
+
+    int tdoa[NUM_CHANNEL] = {0};
+    GccPhatTdoa(all_data, NUM_CHANNEL, NUM_DATA, 0, NUM_DATA/2, tdoa);
+
+    if(ret == 0)
+    {
+        for (int i = 0; i < NUM_CHANNEL; i++) {
+            TRACE("%d\n", tdoa[i]);
+        }
+
+        ret = 1;
+    }
+  
+#endif
+
 #ifdef WL_NSX
-    wl_nsx_16k_denoise(one_buff,left_out);
+    //wl_nsx_16k_denoise(one_buff,left_out);
 #endif
 
     //DUMP16("%5d, ",temp_buff,20);
@@ -312,6 +367,20 @@ int dual_mic_nsx_audioloop(bool on, enum APP_SYSFREQ_FREQ_T freq)
         wl_vad_init(VAD_MODE);
 #endif
 
+#ifdef DUAL_MIC_NSX
+        uint8_t POSSIBLY_UNUSED *speech_buf = NULL;
+        int POSSIBLY_UNUSED speech_len = 0;
+
+        speech_len = app_audio_mempool_free_buff_size() - 1024*4;
+        app_audio_mempool_get_buff(&speech_buf, speech_len);
+        speech_heap_init(speech_buf, speech_len);
+
+        uint8_t POSSIBLY_UNUSED *hp_test = NULL;
+        hp_test = (uint8_t*)speech_malloc(320);
+        //double *need_size = (double*)hp_test;
+        //need_size[1] = 0.12345;
+        TRACE("sizeof float:%d sizeof double:%d ",sizeof(float),sizeof(double));
+#endif
 
         stream_cfg.bits = AUD_BITS_16;
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2  

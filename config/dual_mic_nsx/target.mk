@@ -161,7 +161,7 @@ export POWER_MODE   ?= DIG_DCDC
 
 export SPEECH_CODEC ?= 1
 
-export FLASH_SIZE ?= 0x100000
+export FLASH_SIZE ?= 0x200000
 export FLASH_SUSPEND ?= 1
 export FLASH_API_HIGHPERFORMANCE ?= 1
 
@@ -223,7 +223,9 @@ export WL_VAD ?= 0
 
 export AUDIO_DEBUG ?= 0
 
-export GCC_PLAT ?= 1
+export GCC_PLAT ?= 0
+
+export GCC_PHAT_FIXED ?= 1
 
 export NOTCH_FILTER ?= 0
 

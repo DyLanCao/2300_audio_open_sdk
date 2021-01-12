@@ -221,7 +221,7 @@ export APP_LINEIN_SOURCE ?= 0
 
 export WL_NSX ?= 1
 
-export WL_AGC ?= 1
+export WL_AGC ?= 0
 
 export WL_AGC_32K ?= 0
 
@@ -235,13 +235,13 @@ export DUMP_HEAD ?= 1
 
 export GCC_PLAT ?= 0
 
-export NOTCH_FILTER ?= 1
+export NOTCH_FILTER ?= 0
 
 export WL_DEBUG_MODE ?= 0
 
 export WL_GPIO_SWITCH ?= 1
 
-export WL_STEREO_AUDIO ?= 1
+export WL_STEREO_AUDIO ?= 0
 
 export WL_NSX_5MS ?= 0
 

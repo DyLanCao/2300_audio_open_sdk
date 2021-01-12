@@ -749,6 +749,26 @@ SECTIONS
 		{
 			LONG(0);
 			*:fmdec.o(.text* .data* .rodata* .bss*)
+#if defined(WL_NSX)
+			*:nsx_main.o(.text*)
+			*:spl_sqrt_floor.o(.text*)
+			*:complex_bit_reverse.o(.text*)
+			*:cross_correlation.o(.text*)
+			*:min_max_operations.o(.text*)
+			*:division_operations.o(.text*)
+			*:copy_set_operations.o(.text*)
+			*:spl_init.o(.text*)
+			*:downsample_fast.o(.text*)
+			*:vector_scaling_operations.o(.text*)
+			*:real_fft.o(.text*)
+			*:wl_nsx_core.o(.text*)
+			*:wl_noise_suppression_x.o(.text*)
+#endif
+#if defined(DUAL_MIC_NSX)
+			*:gcc_phat_fixed.o(.text*)
+#endif
+
+
 			*(.overlay_text2)
 			. = ALIGN(4);
 		}
@@ -1041,6 +1061,25 @@ SECTIONS
 		.overlay_data2
 		{
 			LONG(0);
+#if defined(WL_NSX)
+			*:nsx_main.o(.data* .rodata*)
+			*:spl_sqrt_floor.o(.data* .rodata*)
+			*:complex_bit_reverse.o(.data* .rodata*)
+			*:cross_correlation.o(.data* .rodata*)
+			*:min_max_operations.o(.data* .rodata*)
+			*:division_operations.o(.data* .rodata*)
+			*:copy_set_operations.o(.data* .rodata*)
+			*:spl_init.o(.data* .rodata*)
+			*:downsample_fast.o(.data* .rodata*)
+			*:vector_scaling_operations.o(.data* .rodata*)
+			*:real_fft.o(.data* .rodata*)
+			*:wl_nsx_core.o(.data* .rodata*)
+			*:wl_noise_suppression_x.o(.data* .rodata*)
+#endif
+#if defined(DUAL_MIC_NSX)
+			*:gcc_phat_fixed.o(.data* .rodata*)
+#endif
+
 			*(.overlay_data2 .overlay_rodata2)
 			. = ALIGN(4);
 		}
