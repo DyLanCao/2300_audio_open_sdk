@@ -118,6 +118,10 @@ short audio_uart_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 
 #if SPEECH_CODEC_CAPTURE_CHANNEL_NUM == 2    
 
+short one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+short two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
+
+
 static short one_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 static short two_buff[BT_AUDIO_FACTORMODE_BUFF_SIZE>>2];
 

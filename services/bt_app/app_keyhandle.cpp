@@ -627,18 +627,6 @@ void bt_key_handle_func_key(enum APP_KEY_EVENT_T event)
         case  APP_KEY_EVENT_UP:
         case  APP_KEY_EVENT_CLICK:
             {
-#ifndef __APP_WL_SMARTVOICE_LOOP_TEST__
-                app_wl_sv_key_pressed();
-#else
-                static bool toogle = false;
-                if (false == toogle) {
-                    app_wl_smartvoice_start_stream();
-                    toogle = true;
-                } else {
-                    app_wl_smartvoice_stop_stream();
-                    toogle = false;
-                }
-#endif
 
                 // static bool toogle = false;
                 // if (false == toogle) {

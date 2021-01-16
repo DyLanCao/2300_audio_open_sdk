@@ -155,7 +155,7 @@ DAC_CLASSG_ENABLE ?= 1
 
 NO_SLEEP ?= 0
 
-export APP_WL_SMARTVOICE ?= 1
+export APP_WL_SMARTVOICE ?= 0
 
 export POWER_MODE   ?= DIG_DCDC
 
@@ -222,11 +222,11 @@ export AUDIO_LOOPBACK ?= 1
 
 export OPUS_LOOPBACK ?= 0
 
-export APP_LINEIN_SOURCE ?= 1
+export APP_LINEIN_SOURCE ?= 0
 
-export WL_NSX ?= 1
+export WL_NSX ?= 0
 
-export WL_AGC ?= 1
+export WL_AGC ?= 0
 
 export WL_AGC_32K ?= 0
 
@@ -245,8 +245,6 @@ export WL_DEBUG_MODE ?= 0
 export WL_GPIO_SWITCH ?= 0
 
 export WL_NSX_5MS ?= 0
-
-export WL_FIR_FILTER ?= 1
 
 SUPPORT_BATTERY_REPORT ?= 1
 
