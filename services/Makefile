@@ -76,7 +76,7 @@ endif
 MULTIMEDIA_LIB_NAME := whale_services
 
 ifeq ($(ROM_UTILS_ON),1)
-MULTIMEDIA_LIB_NAME := $(MULTIMEDIA_LIB_NAME)_romaac
+MULTIMEDIA_LIB_NAME := $(MULTIMEDIA_LIB_NAME)_v12
 endif
 
 $(MULTIMEDIA_LIB_NAME)-y := $(mmlib_obj)
