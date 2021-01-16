@@ -1,0 +1,223 @@
+#!/bin/sh
+
+set -e
+
+ECHO=/bin/echo
+
+EXPORT_LIB=`cat <<-EOF
+services/lib
+platform/lib
+services/bridge/lib
+EOF
+`
+
+EXPORT_FILE_DIR=`cat <<-EOF
+.gitignore
+Makefile
+apps
+config/Makefile
+config/common.mk
+config/_default_cfg_src_
+config/best1101_e
+config/32xx_demo
+config/programmer
+mbed
+platform/hal
+platform/main
+rtos
+scripts
+services/Makefile
+services/audio_eq
+services/audioflinger
+services/bluedroid/Makefile
+services/bridge/Makefile
+services/bt_app
+services/bt_profiles/Makefile
+services/bt_profiles/inc
+services/fs
+services/multimedia/Makefile
+services/multimedia/algorithm/fft/include
+services/multimedia/audio/process/adp/include
+services/multimedia/audio/process/anc/cfg
+services/multimedia/audio/process/anc/include
+services/multimedia/audio/process/drc/include
+services/multimedia/audio/process/filters/include
+services/multimedia/audio/process/resample/include
+services/multimedia/audio/process/resample/coef
+services/multimedia/fm/inc
+services/multimedia/speech/application/Pcm8kCvsd/include
+services/multimedia/speech/codec/codecs/cvsd/include
+services/multimedia/speech/process/ns_and_ec/include
+services/multimedia/speech/process/plc/include
+services/multimedia/speech/process/recognition/include
+services/multimedia/speech/process/resample/include
+services/multimedia/webrtc/agc/include
+services/multimedia/webrtc/aecm/include
+services/multimedia/webrtc/ns/include
+services/multimedia/webrtc/vad/include
+services/multimedia/speech/process/agc/include
+services/multimedia/speech/process/common/include
+services/multimedia/speech/process/coherent/include/
+services/multimedia/speech/process/lc_mmse_ns/include/
+services/multimedia/speech/process/dual_mic_denoise/include
+services/multimedia/speech/process/coherent_denoise/include/
+services/multimedia/rbcodec/codecs/libhelixaac/*.h
+platform/drivers/sbcacc/sbcaac_dummy.c
+platform/drivers/sbcacc/Makefile
+platform/dsp
+utils/retention_ram/
+services/nv_section/
+services/ble_app/
+services/ble_profiles/
+services/bridge/bridge.h
+services/ble_stack/common/api/
+services/ble_stack/ke/api/
+services/ble_stack/dbg/api/
+services/ble_stack/hci/api/
+services/ble_stack/hl/api/
+services/ble_stack/Makefile
+
+services/ble_stack/ble_ip/*.h
+services/ble_stack/dbg/src/*.h
+services/ble_stack/hci/src/*.h
+services/ble_stack/hl/inc/*.h
+services/ble_stack/hl/src/gap/gapc/*.h
+services/ble_stack/hl/src/gap/gapm/*.h
+services/ble_stack/hl/src/gap/smpc/*.h
+services/ble_stack/hl/src/gap/*.h
+services/ble_stack/hl/src/gatt/attc/*.h
+services/ble_stack/hl/src/gatt/attm/*.h
+services/ble_stack/hl/src/gatt/atts/*.h
+services/ble_stack/hl/src/gatt/*.h
+services/ble_stack/hl/src/gatt/gattc/*.h
+services/ble_stack/hl/src/gatt/gattm/*.h
+services/ble_stack/hl/src/l2c/l2cc/*.h
+services/ble_stack/hl/src/l2c/l2cm/*.h
+services/ble_stack/ke/src/ke_env.h
+services/ble_stack/ke/src/ke_queue.h
+
+services/nvrecord
+services/overlay
+services/resources
+services/voice_recognition
+tests/programmer
+tests/factory_suite
+tests/dual_boot
+utils/boot_struct
+utils/build_info
+utils/cqueue
+utils/crc32
+utils/hexdump
+utils/hwtimer_list
+utils/intersyshci
+utils/jansson
+utils/libc
+utils/list
+utils/lockcqueue
+utils/psramcalib
+utils/uarthci
+EOF
+`
+
+USAGE="
+Usage:
+	`basename $0` <to_file> [ <version> [ <git-archive options> ] ]
+
+Description:
+	<to_file>	Output file name
+	<version>	<tree-ish> - Contents in the <tree-ish>
+			WORKING - Contents in working tree
+	<git-archive options>	Other options for git-archive
+
+Additional options (can be put out of order):
+	L=lib1,...	More library files (comma separated) to pack
+	F=file1,...	More files or directories (comma separated) to pack
+"
+
+ALL_OPTS="$@"
+
+FILTERED_OPTS=
+for opt in $ALL_OPTS; do
+	case "$opt" in
+		L=*) eval $opt ;;
+		F=*) eval $opt ;;
+		*) FILTERED_OPTS="$FILTERED_OPTS $opt" ;;
+	esac
+done
+
+set -- $FILTERED_OPTS
+
+if [ "x$1" = "x" ]; then
+	$ECHO -e "$USAGE"
+	exit 1
+fi
+case "$1" in
+	*.tar.gz) DEST=$1 ;;
+	*) DEST=${1}.tar.gz ;;
+esac
+shift
+
+if [ "x$1" = "x" ]; then
+	VER=HEAD
+else
+	VER=$1
+	shift
+fi
+
+L=`$ECHO $L | sed 's/,/ /g'`
+F=`$ECHO $F | sed 's/,/ /g'`
+
+$ECHO -e "Packing source files ..."
+
+REAL_EXPORT_FILE_DIR=
+for f in $EXPORT_FILE_DIR $F; do
+	commented=0
+	case "$f" in
+		\#*) commented=1 ;;
+	esac
+	if [ "x$commented" = "x1" ]; then
+		$ECHO -en "    Skipping " && ($ECHO -e "$f" | sed 's/^#//')
+	elif [ -d $f ] || [ -f $f ]; then
+		REAL_EXPORT_FILE_DIR="$REAL_EXPORT_FILE_DIR $f"
+	else
+		$ECHO -e "    Warning: Missing $f"
+	fi
+done
+
+if [ "x$REAL_EXPORT_FILE_DIR" = x ]; then
+	$ECHO -e "Error: No files or directories found"
+	exit 2
+fi
+
+ARCH_DEST=${DEST}_tar
+if [ "x$VER" = "xWORKING" ]; then
+	tar -cf $ARCH_DEST $REAL_EXPORT_FILE_DIR
+else
+	git archive --format=tar "$@" -o $ARCH_DEST $VER $REAL_EXPORT_FILE_DIR
+fi
+
+$ECHO -e "Packing library files ..."
+
+REAL_EXPORT_LIB=
+for f in $EXPORT_LIB $L; do
+	commented=0
+	case "$f" in
+		\#*) commented=1 ;;
+	esac
+	if [ "x$commented" = "x1" ]; then
+		$ECHO -en "    Skipping " && ($ECHO -e "$f" | sed 's/^#//')
+	elif [ -d $f ] || [ -f $f ]; then
+		REAL_EXPORT_LIB="$REAL_EXPORT_LIB $f"
+	else
+		$ECHO -e "    Warning: Missing $f"
+	fi
+done
+
+if [ "x$REAL_EXPORT_LIB" != "x" ]; then
+	tar -rf $ARCH_DEST $REAL_EXPORT_LIB
+fi
+
+cat $ARCH_DEST | gzip -c > $DEST
+rm $ARCH_DEST
+$ECHO -e "Done."
+
