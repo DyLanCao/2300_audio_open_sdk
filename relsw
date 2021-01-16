@@ -21,8 +21,6 @@ config/best1101_e
 config/2300_codec
 config/programmer
 mbed
-platform/hal
-platform/main
 rtos
 scripts
 EOF
