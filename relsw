@@ -5,7 +5,7 @@ set -e
 ECHO=/bin/echo
 
 EXPORT_LIB=`cat <<-EOF
-services/lib
+services/audio_dump/lib
 platform/lib
 EOF
 `
