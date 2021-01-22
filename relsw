@@ -6,6 +6,7 @@ ECHO=/bin/echo
 
 EXPORT_LIB=`cat <<-EOF
 services/audio_dump/lib
+services/tota/lib
 platform/lib
 EOF
 `
@@ -17,9 +18,7 @@ apps
 config/Makefile
 config/common.mk
 config/_default_cfg_src_
-config/best1101_e
 config/2300_codec
-config/programmer
 mbed
 rtos
 scripts
