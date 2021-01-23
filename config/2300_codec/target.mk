@@ -234,7 +234,7 @@ export WL_HIGH_SAMPLE ?= 0
 
 export WL_VAD ?= 0
 
-export AUDIO_DEBUG ?= 0
+export AUDIO_DEBUG ?= 1
 
 export GCC_PLAT ?= 0
 

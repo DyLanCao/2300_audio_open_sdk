@@ -155,7 +155,7 @@ DAC_CLASSG_ENABLE ?= 1
 
 NO_SLEEP ?= 0
 
-export APP_WL_SMARTVOICE ?= 1
+export APP_WL_SMARTVOICE ?= 0
 
 export POWER_MODE   ?= DIG_DCDC
 
@@ -214,17 +214,17 @@ export DUMP_NORMAL_LOG ?= 0
 export DUMP_CRASH_LOG ?= 0
 
 # three loopback only need one open
-export MIC_16K_LOOPBACK ?= 1
+export MIC_16K_LOOPBACK ?= 0
 
 export MIC_32K_LOOPBACK ?= 0
 
-export AUDIO_LOOPBACK ?= 0
+export AUDIO_LOOPBACK ?= 1
 
 export OPUS_LOOPBACK ?= 0
 
 export APP_LINEIN_SOURCE ?= 0
 
-export WL_NSX ?= 1
+export WL_NSX ?= 0
 
 export WL_AGC ?= 0
 
@@ -234,9 +234,9 @@ export WL_HIGH_SAMPLE ?= 0
 
 export WL_VAD ?= 0
 
-export AUDIO_DEBUG ?= 0
+export AUDIO_DEBUG ?= 1
 
-export GCC_PLAT ?= 1
+export GCC_PLAT ?= 0
 
 export NOTCH_FILTER ?= 0
 
@@ -245,14 +245,6 @@ export WL_DEBUG_MODE ?= 0
 export WL_GPIO_SWITCH ?= 0
 
 export WL_NSX_5MS ?= 0
-
-# aec process work on it
-export WL_TEL_DENOISE ?= 0
-
-export WL_AEC ?= 0
-
-export STEREO_MIC ?= 1
-
 
 SUPPORT_BATTERY_REPORT ?= 1
 
