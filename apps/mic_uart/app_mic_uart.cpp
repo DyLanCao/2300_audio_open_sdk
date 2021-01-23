@@ -457,72 +457,6 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 	    //TRACE("aecm  echo time: lens:%d  g_time_cnt:%d ",len, g_time_cnt);
     }
 
-#ifdef WL_VAD
-
-    wl_vad_process_frame(pcm_buff,pcm_len);\
-
-    // if(vad_state == ON)
-    // {
-	//     TRACE("vad_state is:%d  ",vad_state);
-    // }
-
-#endif
-
-#ifdef NOTCH_FILTER
-    //DUMP16("%5d, ",pcm_buff,30);
-    for(uint16_t icnt = 0; icnt < pcm_len; icnt++)
-    {
-
-        double yout = (double)notch_filter_process(pcm_buff[icnt]);
-        //yout = (double)notch_filter_process_sec(yout);
-        yout = (double)notch_filter_process_thr(yout);
-        //yout = (double)notch_filter_process_four(yout);
-        yout = (double)notch_filter_process_five(yout);
-        //yout = (double)notch_filter_process_six(yout);
-        out_buff[icnt] = (short)yout;
-        //printf("yout:%f \n\t",yout);
-
-    }
-#endif
-
-
-
-#ifdef WL_FIR_FILTER
-        double floatInput[pcm_len];
-        double floatOutput[pcm_len];
-        // convert to doubles
-        intToFloat(out_buff, floatInput, pcm_len);
-        // perform the filtering
-        firFloat(fir_coeffs, floatInput, floatOutput, pcm_len,FILTER_LEN);
-        // convert to ints
-        floatToInt(floatOutput, out_buff, pcm_len);
-#endif
-
-
-#ifdef WL_NSX
-
-    wl_nsx_16k_denoise(pcm_buff,out_buff);
-    memset(pcm_buff,0x0,len);
-    memcpy(pcm_buff,out_buff,len);
-
-#ifdef DUMP_HEAD
-    revert_buff[0] = 0xabcd;
-    revert_buff[1] = 0x140;
-
-    for(uint32_t inum = 0; inum<pcm_len;inum++)
-    {
-        revert_buff[2*(inum + 1)+0] = pcm_buff[inum];
-        revert_buff[2*(inum + 1)+1] = -pcm_buff[inum];
-    }
-#endif
-
-#endif
-
-// #ifdef WL_VAD
-//     //memset(pcm_buff,0x0,pcm_len*2);
-//     wl_vad_process_frame(pcm_buff,pcm_len);
-// #endif
-
 
 #ifdef AUDIO_DEBUG
     
@@ -545,7 +479,7 @@ static uint32_t app_mic_uart_data_come(uint8_t *buf, uint32_t len)
 
 
 
-    app_audio_pcmbuff_put((uint8_t*)out_buff, len);
+    app_audio_pcmbuff_put((uint8_t*)pcm_buff, len);
 
 
     if(false == (nsx_cnt & 0x3F))

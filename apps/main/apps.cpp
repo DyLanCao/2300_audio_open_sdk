@@ -149,10 +149,6 @@ extern int app_source_linein_loopback_test(bool on);
 #endif
 
 
-#ifdef MIC_16K_LOOPBACK
-#include "app_mic_16k.h"
-#endif
-
 
 #ifdef MIC_32K_LOOPBACK
 #include "app_mic_32k.h"
@@ -1544,41 +1540,6 @@ int app_init(void)
     while(1);
 #endif
 
-#ifdef MIC_16K_LOOPBACK
-
-#ifdef WL_DEBUG_MODE
-    TRACE("nv debug mode :0x%x",nv_debug_mode_get());
-    if(nv_debug_mode_get() == NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE)
-    {
-        TRACE("****** end of test mode ****** ");
-        osDelay(10);
-        return -1;
-    }
-#endif 
-
-   app_mic_16k_audioloop(true, APP_SYSFREQ_208M);
-
-
-    while(1);
-#endif
-
-#ifdef DUAL_MIC_NSX
-
-#ifdef WL_DEBUG_MODE
-    TRACE("nv debug mode :0x%x",nv_debug_mode_get());
-    if(nv_debug_mode_get() == NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE)
-    {
-        TRACE("****** end of test mode ****** ");
-        osDelay(10);
-        return -1;
-    }
-#endif 
-
-   dual_mic_nsx_audioloop(true, APP_SYSFREQ_208M);
-
-    while(1);
-#endif
-
 
 #ifdef MIC_32K_LOOPBACK
 
@@ -1617,11 +1578,6 @@ int app_init(void)
     while(1);
 #endif
 
-
-#ifdef OPUS_LOOPBACK
-    app_wl_smartvoice_player(true, APP_SYSFREQ_208M);
-    while(1);
-#endif
 
     btdrv_start_bt();
     if (pwron_case != APP_POWERON_CASE_TEST) {
