@@ -28,6 +28,7 @@ extern "C" {
 #define NVRAM_ENV_TWS_MODE_DEFAULT (0xff)
 #define NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT (0xaabbccdd)
 #define NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE (0xaaaaaaaa)
+#define NVRAM_ENV_WL_BOARD_MODE (0xabcd)
 
 struct media_language_t
 {
@@ -49,6 +50,7 @@ struct ibrt_mode_t
 struct factory_tester_status_t
 {
     uint32_t status;
+    uint32_t init_flag;
 };
 
 #ifdef IS_MULTI_AI_ENABLED
@@ -93,6 +95,11 @@ void nv_record_update_ibrt_info(uint32_t newMode,bt_bdaddr_t *ibrtPeerAddr);
 void nv_record_update_ibrt_info_debug_mode(void);
 
 uint32_t nv_debug_mode_get(void);
+
+uint32_t nv_init_flag_mode_get(void);
+
+void nv_record_init_board_mode(void);
+
 #endif 
 
 #ifdef __cplusplus

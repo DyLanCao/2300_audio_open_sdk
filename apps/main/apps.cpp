@@ -156,6 +156,7 @@ extern int app_source_linein_loopback_test(bool on);
 
 #ifdef MIC_UART
 #include "app_mic_uart.h"
+union SECURITY_VALUE_T sec_val;
 #endif
 
 #ifdef DUAL_MIC_NSX
@@ -1562,18 +1563,28 @@ int app_init(void)
 
 #ifdef MIC_UART
 
-
 #ifdef WL_DEBUG_MODE
     TRACE("nv debug mode :0x%x",nv_debug_mode_get());
+    //nv_record_init_board_mode();
+
+    TRACE("nv sec get:sec_val:0x%x vendor_id:0x%x ",sec_val.reg,sec_val.vendor_id);
+
+    if(nv_init_flag_mode_get() != NVRAM_ENV_WL_BOARD_MODE)
+    {
+        TRACE("******you is not whale board, exit ****** ");
+        osDelay(10);
+        return -1;
+    }
+
     if(nv_debug_mode_get() == NVRAM_ENV_FACTORY_TESTER_STATUS_DEFAULT_DEBUG_MODE)
     {
-        TRACE("****** end of test mode ****** ");
+        TRACE("****** end of test mode please contract whale tech group ****** ");
         osDelay(10);
         return -1;
     }
 #endif 
 
-   app_mic_uart_audioloop(true, APP_SYSFREQ_208M);
+    app_mic_uart_audioloop(true, APP_SYSFREQ_208M);
 
     while(1);
 #endif

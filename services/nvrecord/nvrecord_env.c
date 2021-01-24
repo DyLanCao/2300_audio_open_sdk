@@ -147,4 +147,26 @@ uint32_t nv_debug_mode_get(void)
 {
     return  nvrecord_env_p->debug_status.status;
 }
+
+void nv_record_init_board_mode(void)
+{
+    uint32_t init_flg=NVRAM_ENV_WL_BOARD_MODE;
+
+    TRACE("##%s,0x%x",__func__,init_flg);
+
+    struct nvrecord_env_t *nvrecord_env;
+    nv_record_env_get(&nvrecord_env);
+
+    nv_record_sector_clear();
+    nv_record_env_init();
+    nvrecord_env_p->debug_status.init_flag = init_flg;
+    nv_record_env_set(nvrecord_env);
+    nv_record_flash_flush();
+}
+
+uint32_t nv_init_flag_mode_get(void)
+{
+    return  nvrecord_env_p->debug_status.init_flag;
+}
+
 #endif 

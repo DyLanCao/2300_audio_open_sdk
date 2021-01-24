@@ -222,6 +222,8 @@ export AUDIO_LOOPBACK ?= 0
 
 export APP_LINEIN_SOURCE ?= 0
 
+export WL_DEBUG_MODE ?= 1
+
 
 SUPPORT_BATTERY_REPORT ?= 1
 

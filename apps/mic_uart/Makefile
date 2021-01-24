@@ -1,9 +1,24 @@
 cur_dir := $(dir $(lastword $(MAKEFILE_LIST)))
 
-obj-y := $(patsubst $(cur_dir)%,%,$(wildcard $(cur_dir)*.c $(cur_dir)*.cpp $(cur_dir)*.S))
-obj-y := $(obj-y:.c=.o)
-obj-y := $(obj-y:.cpp=.o)
-obj-y := $(obj-y:.S=.o)
+obj_s := $(patsubst $(cur_dir)%,%,$(wildcard $(cur_dir)*.s))
+obj_c := $(patsubst $(cur_dir)%,%,$(wildcard $(cur_dir)*.c))
+obj_cpp := $(patsubst $(cur_dir)%,%,$(wildcard $(cur_dir)*.cpp))
+
+obj_c += $(patsubst $(cur_dir)%,%,$(wildcard $(cur_dir)src/*.c))
+
+mmlib_obj := $(obj_c:.c=.o) $(obj_s:.S=.o) $(obj_cpp:.cpp=.o)
+
+PLAT_LIB_NAME := mic_uart
+
+ifeq ($(ROM_UTILS_ON),1)
+PLAT_LIB_NAME := $(PLAT_LIB_NAME)_v12
+endif
+
+$(PLAT_LIB_NAME)-y := $(mmlib_obj)
+
+rel_src_obj :=
+
+obj-y := $(PLAT_LIB_NAME).a $(rel_src_obj)
 
 ccflags-y +=  \
     -Iutils/boot_struct \
@@ -30,14 +45,5 @@ ccflags-y +=  \
     -Iplatform/drivers/usb/usb_dev/inc \
 	-Iapps/battery
 
-ifeq ($(AUDIO_RESAMPLE),1)
-CFLAGS_app_factory_audio.o += -D__AUDIO_RESAMPLE__
-endif
-ifeq ($(SW_CAPTURE_RESAMPLE),1)
-CFLAGS_app_factory_audio.o += -DSW_CAPTURE_RESAMPLE
-endif
 
-ifeq ($(POWERKEY_I2C_SWITCH),1)
-CFLAGS_app_factory.o += -DPOWERKEY_I2C_SWITCH
-endif
 
