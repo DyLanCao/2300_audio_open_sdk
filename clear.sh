@@ -1,1 +1,1 @@
-make T=2300_codec DEBUG=1 clean
+make T=mic_uart DEBUG=1 clean

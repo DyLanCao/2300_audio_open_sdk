@@ -95,7 +95,6 @@ lib/
 
 *.log
 *.map
-*.sh
 *.json
 *.zip
 *.cap
